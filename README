@@ -1,0 +1,45 @@
+ThinkPad Fan Control daemon (tpfand)
+====================================
+
+tpfand controls the system fan of ThinkPad notebooks based on specified 
+temperature profiles. Seperate trigger points can be configured for every
+temperature sensor in the notebook.
+
+tpfand is written entirely in Python and licensed under the GNU GPL version 3.
+
+REQUIREMENTS
+============
+Python 2.5
+DBus with bindings for Python
+thinkpad_acpi kernel module with fan control support
+
+NOTE: Some versions of the thinkpad_acpi module must be loaded
+	  with fan_control=1 to enable fan control. On some distributions
+	  you have to append the line "thinkpad_acpi fan_control=1" to
+	  /etc/modules. Refer to your distribution manual about
+	  kernel module configuration.
+
+INSTALLATION
+============
+1. Adjust src/tpfand/build.py to your needs.
+2. Run make install
+3. Make sure that tpfand is started on every boot. This is done
+   in a distribution specific way. (for example with update-rc.d
+   on Ubuntu)
+4. Install the man page tpfand.8 (optional)
+5. Download contributed profiles from 
+   http://www.gambitchess.org/tp-fan/profile_download.py
+   and extract them to the directory you specified under data_dir in build.py. 
+   (optional)
+
+You can uninstall this program by running make uninstall.
+
+CONFIGURATION
+=============
+The configuration file is /etc/tpfand.conf.
+After manual changes to this configuration file tpfand must
+be restarted.
+
+tpfan-admin, a GTK+ configuration tool, is also available and the
+recommended way of configuring tpfand.
+

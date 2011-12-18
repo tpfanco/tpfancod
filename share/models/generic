@@ -1,0 +1,22 @@
+#
+# tpfand generic profile
+#
+# Options:
+# hysteresis = [hysteresis temperature difference]
+# interval_speed = [fan speed for interval mode]
+# interval_duration = [duration of fan rotation in interval mode]
+# interval_delay = [delay between fan rotations in interval mode]
+#
+# Trigger point syntax:
+# [sensor-id]. [human readable sensor name] = [temperature]:[fan level] ...
+# [fan level] = 0: fan off
+# [fan level] = 1: interval cooling mode
+# [fan level] = 255: hardware controlled cooling mode
+# default rule is used for all unspecified sensors
+#
+
+hysteresis = 2
+interval_speed = 1
+interval_duration = 500
+interval_delay = 5000
+comment = The generic profile is used because no fan profile is available for your notebook.

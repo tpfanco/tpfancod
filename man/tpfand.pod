@@ -1,0 +1,83 @@
+=head1 NAME
+
+tpfand - Controls the fan speed of IBM/Lenovo ThinkPad-Notebooks.
+
+=head1 SYNOPSIS
+
+tpfand [B<--quiet>]
+
+=head1 DESCRIPTION
+
+B<tpfand> controls the system fan of ThinkPad notebooks based on specified temperature profiles. Seperate trigger points can be configured for every temperature sensor in the notebook.
+
+=over 8
+
+=item B<--quiet>
+
+Supresses startup messages
+
+=back
+
+=head1 CONFIGURATION
+
+B<tpfand> can either be configured interactively by running B<tpfan-admin> or by modifying B</etc/tpfand.conf>. After manually changing the configuration file the daemon must be restarted for the new configuration to take effect.
+
+You can specify the following options in B</etc/tpfand.conf>:
+
+=over 8
+
+=item B<enabled> = I<True / False>
+
+If I<True> the system fan is controlled by B<tpfand>, otherwise by the embedded hardware controller. 
+
+=item B<override_profile> = I<True / False>
+
+If I<True> fan trigger temperatures and the options B<hysteresis>, B<interval_speed>, B<interval_duration> and B<interval_delay> are read from the config file, otherwise from the profile matching your notebook stored in B</usr/share/tpfand/models>.
+This option must be I<True> if you want to manually specify trigger temperatures.
+
+=item B<hysteresis> = I<integer> (K)
+
+Specifies the hysteresis in K.
+
+=item B<interval_speed> = I<integer> (1-7)
+
+Specifies the fan speed in interval cooling mode. Value must be between 1 (slowest) and 7 (fastest). Usually this should be set to 1.
+
+=item B<interval_duration> = I<integer> (msec)
+
+Specifies the time in msec the fan may be running in interval cooling mode.
+
+=item B<interval_delay> = I<integer> (msec)
+
+Specifies the minimum time in msec the fan must be off after running in interval colling mode.
+
+=item B<Fan trigger temperature>
+
+B<Syntax:> [sensor id]. [sensor name] = [T1]:[F1] [T2]:[F2] ...
+
+where
+
+B<sensor id> is the id of the sensor (0-15).
+
+B<sensor name> is a human readable sensor name, that will be shown by B<tpfan-admin>.
+
+B<Tn> is a temperature in °C.
+
+B<Fn> is the fan level the system fan should run at when the temperature of this sensor rises about B<Tn>. 0 is off, 1 is interval cooling mode, 2-8 are fan speeds.
+
+=back
+
+=head1 BUGS
+
+Please report bugs at http://code.google.com/p/tpfanco/issues/list
+
+=head1 AUTHORS
+
+B<tpfand> was written by Sebastian Urban <surban84@googlemail.com> and is released under the GNU General Public License, version 3 or later.
+
+=head1 SEE ALSO
+
+B<tpfan-admin>(1)
+
+=cut
+

@@ -24,6 +24,9 @@ import gobject
 
 from tpfand import build, settings
 
+#debug
+debug = False
+
 # Configuration
 act_settings = None
 
@@ -37,8 +40,10 @@ class Control(dbus.service.Object):
     """fan controller"""
     
     # poll time
-    poll_time = 4000
+    poll_time = 3500
     # kernel watchdog time
+    # the thinkpad_acpi watchdog accepts intervals between 1 and 120 seconds
+    # for safety reasons one shouldn't use values higher than 5 seconds        
     watchdog_time = 5    
     # value that temperature has to fall below to slow down fan  
     current_trip_temps = { }
@@ -53,10 +58,10 @@ class Control(dbus.service.Object):
 
     def __init__(self, bus, path):
         dbus.service.Object.__init__(self, bus, path)
-        self.repoll(0)
+        self.repoll(1)
     
     def set_speed(self, speed):
-        """sets the fan speed (0=off, 2-8=normal, 255=ec, 256=full-speed)"""  
+        """sets the fan speed (0=off, 2-8=normal, 254=disengaged, 255=ec, 256=full-speed)"""  
         try:                          
             fanfile = open('/proc/acpi/ibm/fan', 'w')
             fanfile.write("watchdog %d" % self.watchdog_time)
@@ -66,6 +71,8 @@ class Control(dbus.service.Object):
             else:
                 fanfile.write('enable')
                 fanfile.flush()
+                if speed == 254:
+                    fanfile.write("level disengaged")
                 if speed == 255:
                     fanfile.write("level auto")
                 elif speed == 256:
@@ -88,7 +95,7 @@ class Control(dbus.service.Object):
     
     @dbus.service.method('org.thinkpad.fancontrol.Control', in_signature='', out_signature='ai')
     def get_temperatures(self):
-        """returns list of current sensor readings, +/-128 means sensor is disconnected"""
+        """returns list of current sensor readings, +/-128 or 0 means sensor is disconnected"""
         try:
             tempfile = open('/proc/acpi/ibm/thermal', 'r')
             elements = tempfile.readline().split()[1:]
@@ -154,19 +161,38 @@ class Control(dbus.service.Object):
         """calls poll again after interval msecs"""
         ival = int(interval)
         # ensure limits
+        # i.e. make sure that we always repoll before the watchdog timer runs out        
         if ival < 1: 
             ival = 1
-        if ival > 5000:
-            ival = 5000
+        if ival > self.watchdog_time * 1000:
+            ival = self.watchdog_time * 1000
+        
         gobject.timeout_add(ival, self.poll)
             
     def poll(self):
         """main fan control routine"""
+        # get the current fan level
+        fan_state = self.get_fan_state()
+        level = fan_state['level']
+        if debug:
+              print
+              print str(time.strftime("%H:%M:%S")) + ': Polling the sensors'
+              print 'Current fan level: ' + str(level)
+      
+       
         if act_settings.enabled:
             # early interval shutdown
             curtime = time.time() * 1000.0
             if self.interval_running and curtime >= self.last_interval_spinup + act_settings.interval_duration:
                 self.set_speed(0)
+                        
+            # probing the disengaged mode
+            if level not in (0,1,254,255,256):
+                if debug:
+                  print 'Applying fan pulsing fix'
+                self.set_speed(254)
+                time.sleep(0.5)
+                self.set_speed(level)
                         
             # read thermal data
             try:
@@ -178,12 +204,17 @@ class Control(dbus.service.Object):
                 return False
 
             new_speed = 0
+            if debug:
+                        print 'Current sensor values:'
             for id in range(0, len(temps)):
-                temp = temps[id]
-                # value is +/-128, if sensor is disconnected
+                temp = temps[id]                
+                # value is +/-128 or 0, if sensor is disconnected
                 if abs(temp) != 128 and abs(temp) != 0:
-                    points = act_settings.trigger_points[id]
+                    points = act_settings.trigger_points[id]                    
                     speed = 0
+                    
+                    if debug:                        
+                        print '    Sensor ' + str(id) +': ' + str(temp)
                     
                     # check if temperature is above hysteresis shutdown point
                     if id in self.current_trip_temps:
@@ -201,7 +232,9 @@ class Control(dbus.service.Object):
                             speed = trigger_speed
                     
                     new_speed = max(new_speed, speed)                                            
-            
+            if debug:
+                print 'Setting fan level to ' + str(new_speed)
+                
             # set fan speed
             if new_speed == 1:
                 # handle interval mode
@@ -299,7 +332,10 @@ def start_fan_control(quiet):
         print 'WARNING: THIS PROGRAM MAY DAMAGE YOUR COMPUTER.'
         print '         PROCEED ONLY IF YOU KNOW HOW TO MONITOR SYSTEM TEMPERATURE.'
         print
-                
+               
+    if debug:
+        print 'Running in debug mode'
+    
     if not is_system_suitable():
         print "Fatal error: unable to set fanspeed, enable watchdog or read temperature"
         print "             Please make sure you are root and a recent"
@@ -314,41 +350,43 @@ def start_fan_control(quiet):
     daemonize()
     
 def daemonize():
-    """go into daemon mode"""   
-    # from: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66012
-    # do the UNIX double-fork magic, see Stevens' "Advanced 
-    # Programming in the UNIX Environment" for details (ISBN 0201563177)
-    try: 
-        pid = os.fork() 
-        if pid > 0:
-            # exit first parent
-            sys.exit(0) 
-    except OSError, e: 
-        print >>sys.stderr, "fork #1 failed: %d (%s)" % (e.errno, e.strerror) 
-        sys.exit(1)
+    """ don't go into daemon mode if debug mode is active """
+    if not debug:
+        """go into daemon mode"""   
+        # from: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66012
+        # do the UNIX double-fork magic, see Stevens' "Advanced 
+        # Programming in the UNIX Environment" for details (ISBN 0201563177)
+        try: 
+            pid = os.fork() 
+            if pid > 0:
+                # exit first parent
+                sys.exit(0) 
+        except OSError, e: 
+            print >>sys.stderr, "fork #1 failed: %d (%s)" % (e.errno, e.strerror) 
+            sys.exit(1)
 
-    # decouple from parent environment
-    os.chdir("/") 
-    os.setsid() 
-    os.umask(0) 
+        # decouple from parent environment
+        os.chdir("/") 
+        os.setsid() 
+        os.umask(0) 
 
-    # do second fork
-    try: 
-        pid = os.fork() 
-        if pid > 0:
-            sys.exit(0) 
-    except OSError, e: 
-        print >>sys.stderr, "fork #2 failed: %d (%s)" % (e.errno, e.strerror) 
-        sys.exit(1) 
+        # do second fork
+        try: 
+            pid = os.fork() 
+            if pid > 0:
+                sys.exit(0) 
+        except OSError, e: 
+            print >>sys.stderr, "fork #2 failed: %d (%s)" % (e.errno, e.strerror) 
+            sys.exit(1) 
 
-    # write pid file
-    try:
-        pidfile = open(build.pid_path, 'w')
-        pidfile.write(str(os.getpid()) + "\n")
-        pidfile.close()
-    except IOError:
-        print >>sys.stderr, "could not write pid-file: ", build.pid_path
-        sys.exit(1)
+        # write pid file
+        try:
+            pidfile = open(build.pid_path, 'w')
+            pidfile.write(str(os.getpid()) + "\n")
+            pidfile.close()
+        except IOError:
+            print >>sys.stderr, "could not write pid-file: ", build.pid_path
+            sys.exit(1)
     
     # start the daemon main loop
     daemon_main()   
@@ -356,8 +394,13 @@ def daemonize():
     
 def main():
     quiet = False
+    global debug
+    
     if "--quiet" in sys.argv:
         quiet = True
+    
+    if "--debug" in sys.argv:
+        debug = True
         
     start_fan_control(quiet)     
 

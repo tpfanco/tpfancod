@@ -24,6 +24,9 @@ import gobject
 
 from tpfand import build, settings
 
+IBM_fan = '/proc/acpi/ibm/fan'
+IBM_thermal = '/proc/acpi/ibm/thermal'
+
 #debug
 debug = False
 
@@ -63,7 +66,7 @@ class Control(dbus.service.Object):
     def set_speed(self, speed):
         """sets the fan speed (0=off, 2-8=normal, 254=disengaged, 255=ec, 256=full-speed)"""  
         try:                          
-            fanfile = open('/proc/acpi/ibm/fan', 'w')
+            fanfile = open(IBM_fan, 'w')
             fanfile.write("watchdog %d" % self.watchdog_time)
             fanfile.flush()
             if speed == 0:
@@ -97,7 +100,7 @@ class Control(dbus.service.Object):
     def get_temperatures(self):
         """returns list of current sensor readings, +/-128 or 0 means sensor is disconnected"""
         try:
-            tempfile = open('/proc/acpi/ibm/thermal', 'r')
+            tempfile = open(IBM_thermal, 'r')
             elements = tempfile.readline().split()[1:]
             tempfile.close()
             return map(int, elements)
@@ -114,7 +117,7 @@ class Control(dbus.service.Object):
     def get_fan_state(self):
         """Returns current (fan_level, fan_rpm)"""
         try:
-            fanfile = open('/proc/acpi/ibm/fan', 'r')
+            fanfile = open(IBM_fan, 'r')
             for line in fanfile.readlines():
                 key, value = line.split(':')
                 if key == 'speed':
@@ -306,16 +309,16 @@ def is_system_suitable():
     """returns True iff fan speed setting, watchdog and thermal reading is supported by kernel and 
        we have write permissions"""
     try:
-        fanfile = open('/proc/acpi/ibm/fan', 'w')
+        fanfile = open(IBM_fan, 'w')
         fanfile.write('level auto')
         fanfile.flush()
         fanfile.close()
-        fanfile = open('/proc/acpi/ibm/fan', 'w')
+        fanfile = open(IBM_fan, 'w')
         fanfile.write('watchdog 5')
         fanfile.flush()
         fanfile.close()
         
-        tempfile = open('/proc/acpi/ibm/thermal', 'r')
+        tempfile = open(IBM_thermal, 'r')
         tempfile.readline()
         tempfile.close()
         return True

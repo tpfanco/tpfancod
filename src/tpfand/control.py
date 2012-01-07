@@ -55,9 +55,9 @@ class Control(dbus.service.Object):
     # last spinup time for interval cooling mode    
     last_interval_spinup = 0
     # fan in interval cooling mode
-    interval_mode = False
+    #interval_mode = False
     # fan on in interval cooling mode
-    interval_running = False        
+    #interval_running = False        
 
     def __init__(self, bus, path):
         dbus.service.Object.__init__(self, bus, path)
@@ -65,6 +65,8 @@ class Control(dbus.service.Object):
     
     def set_speed(self, speed):
         """sets the fan speed (0=off, 2-8=normal, 254=disengaged, 255=ec, 256=full-speed)"""  
+        if debug:                        
+            print 'Fan level will be set  to ' + str(speed)
         try:                          
             fanfile = open(IBM_fan, 'w')
             fanfile.write("watchdog %d" % self.watchdog_time)
@@ -130,10 +132,13 @@ class Control(dbus.service.Object):
                         level = 255
                     elif value == 'disengaged' or value == 'full-speed':
                         level = 256
+                    #Ugly stub for the removed interval mode
+                    elif value == 1:
+                        level = 2
                     else:
                         level = int(value) + 1 
-            if act_settings.enabled and self.interval_mode:
-                level = 1
+            #if act_settings.enabled and self.interval_mode:
+            #    level = 1
             return {'level': level,
                     'rpm': rpm }
         except Exception, e:
@@ -185,9 +190,9 @@ class Control(dbus.service.Object):
        
         if act_settings.enabled:
             # early interval shutdown
-            curtime = time.time() * 1000.0
-            if self.interval_running and curtime >= self.last_interval_spinup + act_settings.interval_duration:
-                self.set_speed(0)
+            #curtime = time.time() * 1000.0
+            #if self.interval_running and curtime >= self.last_interval_spinup + act_settings.interval_duration:
+            #    self.set_speed(0)
                         
             # probing the disengaged mode
             if level not in (0,1,254,255,256):
@@ -239,33 +244,33 @@ class Control(dbus.service.Object):
                 print 'Setting fan level to ' + str(new_speed)
                 
             # set fan speed
-            if new_speed == 1:
-                # handle interval mode
-                self.interval_mode = True
-                curtime = time.time() * 1000.0
-                if self.interval_running:
-                    if curtime >= self.last_interval_spinup + act_settings.interval_duration:
-                        self.set_speed(0)
-                        self.interval_running = False
-                        self.repoll(min(self.poll_time, act_settings.interval_delay))
-                    else:
-                        self.set_speed(act_settings.interval_speed)
-                        self.repoll(max(0, min(self.poll_time, self.last_interval_spinup + act_settings.interval_duration - curtime)))
-                else:
-                    if curtime >= self.last_interval_spinup + act_settings.interval_duration + act_settings.interval_delay:
-                        self.last_interval_spinup = curtime
-                        self.set_speed(act_settings.interval_speed)
-                        self.interval_running = True
-                        self.repoll(min(self.poll_time, act_settings.interval_duration))
-                    else:
-                        self.set_speed(0)
-                        self.repoll(max(0, min(self.poll_time, self.last_interval_spinup + act_settings.interval_duration + act_settings.interval_delay - curtime)))
-            else:
+            #if new_speed == 1:
+            #    # handle interval mode
+            #    self.interval_mode = True
+            #    curtime = time.time() * 1000.0
+            #    if self.interval_running:
+            #        if curtime >= self.last_interval_spinup + act_settings.interval_duration:
+            #            self.set_speed(0)
+            #            self.interval_running = False
+            #            self.repoll(min(self.poll_time, act_settings.interval_delay))
+            #        else:
+            #            self.set_speed(act_settings.interval_speed)
+            #            self.repoll(max(0, min(self.poll_time, self.last_interval_spinup + act_settings.interval_duration - curtime)))
+            #    else:
+            #        if curtime >= self.last_interval_spinup + act_settings.interval_duration + act_settings.interval_delay:
+            #            self.last_interval_spinup = curtime
+            #            self.set_speed(act_settings.interval_speed)
+            #            self.interval_running = True
+            #            self.repoll(min(self.poll_time, act_settings.interval_duration))
+            #        else:
+            #            self.set_speed(0)
+            #            self.repoll(max(0, min(self.poll_time, self.last_interval_spinup + act_settings.interval_duration + act_settings.interval_delay - curtime)))
+            #else:
                 # handle normal fan mode
-                self.interval_mode = False
-                self.interval_running = False
-                self.set_speed(new_speed)      
-                self.repoll(self.poll_time)
+            #    self.interval_mode = False
+            #    self.interval_running = False
+            self.set_speed(new_speed)      
+            self.repoll(self.poll_time)
         else:
             # fan control disabled
             self.set_speed(255)

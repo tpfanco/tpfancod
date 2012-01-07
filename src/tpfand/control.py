@@ -181,12 +181,11 @@ class Control(dbus.service.Object):
         """main fan control routine"""
         # get the current fan level
         fan_state = self.get_fan_state()
-        level = fan_state['level']
+        
         if debug:
               print
               print str(time.strftime("%H:%M:%S")) + ': Polling the sensors'
-              print 'Current fan level: ' + str(level)
-      
+              print 'Current fan level: ' + str(fan_state['level']) + ' (' + str(fan_state['rpm']) + ' RPM)'
        
         if act_settings.enabled:
             # early interval shutdown

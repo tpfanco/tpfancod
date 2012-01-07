@@ -195,12 +195,12 @@ class Control(dbus.service.Object):
             #    self.set_speed(0)
                         
             # probing the disengaged mode
-            if level not in (0,1,254,255,256):
-                if debug:
-                  print 'Applying fan pulsing fix'
-                self.set_speed(254)
-                time.sleep(0.5)
-                self.set_speed(level)
+            #if level not in (0,1,254,255,256):
+            #    if debug:
+            #      print 'Applying fan pulsing fix'
+            #    self.set_speed(254)
+            #    time.sleep(0.5)
+            #    self.set_speed(level)
                         
             # read thermal data
             try:

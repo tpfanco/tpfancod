@@ -64,27 +64,35 @@ class Control(dbus.service.Object):
         self.repoll(1)
     
     def set_speed(self, speed):
-        """sets the fan speed (0=off, 2-8=normal, 254=disengaged, 255=ec, 256=full-speed)"""  
-        if debug:                        
-            print 'Fan level will be set  to ' + str(speed)
-        try:                          
+        """sets the fan speed (0=off, 2-8=normal, 254=disengaged, 255=ec, 256=full-speed)"""
+        fan_state = self.get_fan_state()
+        try:
+            if debug:
+                print '  Rearming fan watchdog timer (+' + str(self.watchdog_time) + ' s)'
+                print '  Current fan level is ' + str(fan_state['level'])
             fanfile = open(IBM_fan, 'w')
             fanfile.write("watchdog %d" % self.watchdog_time)
-            fanfile.flush()
-            if speed == 0:
-                fanfile.write('disable')
+            fanfile.flush()            
+            if speed == fan_state['level']:
+                if debug:
+                    print '  -> Keeping the current fan level unchanged'
             else:
-                fanfile.write('enable')
-                fanfile.flush()
-                if speed == 254:
-                    fanfile.write("level disengaged")
-                if speed == 255:
-                    fanfile.write("level auto")
-                elif speed == 256:
-                    fanfile.write("level full-speed")
+                if debug:
+                    print '  -> Setting fan level to ' + str(speed)
+                if speed == 0:
+                    fanfile.write('disable')
                 else:
-                    fanfile.write("level %d" % (speed - 1))
-            fanfile.flush()
+                    fanfile.write('enable')
+                    fanfile.flush()
+                    if speed == 254:
+                        fanfile.write("level disengaged")
+                    if speed == 255:
+                        fanfile.write("level auto")
+                    elif speed == 256:
+                        fanfile.write("level full-speed")
+                    else:
+                        fanfile.write("level %d" % (speed - 1))
+            fanfile.flush()            
         except IOError:
             # sometimes write fails during suspend/resume
             pass
@@ -240,7 +248,7 @@ class Control(dbus.service.Object):
                     
                     new_speed = max(new_speed, speed)                                            
             if debug:
-                print 'Setting fan level to ' + str(new_speed)
+                print 'Trying to set fan level to ' + str(new_speed) + ':'
                 
             # set fan speed
             #if new_speed == 1:

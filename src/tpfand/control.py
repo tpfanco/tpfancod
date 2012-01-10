@@ -1,7 +1,8 @@
 #! /usr/bin/env python
 # -*- coding: utf8 -*-
 #
-# tp-fancontrol - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks
+# tpfanco - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks
+# Copyright (C) 2011-2012 Vladyslav Shtabovenko
 # Copyright (C) 2007-2008 Sebastian Urban
 #
 # This program is free software: you can redistribute it and/or modify
@@ -196,10 +197,6 @@ class Control(dbus.service.Object):
               print 'Current fan level: ' + str(fan_state['level']) + ' (' + str(fan_state['rpm']) + ' RPM)'
        
         if act_settings.enabled:
-            # early interval shutdown
-            #curtime = time.time() * 1000.0
-            #if self.interval_running and curtime >= self.last_interval_spinup + act_settings.interval_duration:
-            #    self.set_speed(0)
                         
             # probing the disengaged mode
             #if level not in (0,1,254,255,256):
@@ -229,8 +226,7 @@ class Control(dbus.service.Object):
                     speed = 0
                     
                     if debug:                        
-                        print '    Sensor ' + str(id) +': ' + str(temp)
-                    
+                        print '    Sensor ' + str(id) +': ' + str(temp)                    
                     # check if temperature is above hysteresis shutdown point
                     if id in self.current_trip_temps:
                         if temp >= self.current_trip_temps[id]:
@@ -246,36 +242,10 @@ class Control(dbus.service.Object):
                             self.current_trip_speeds[id] = trigger_speed
                             speed = trigger_speed
                     
-                    new_speed = max(new_speed, speed)                                            
+                    new_speed = max(new_speed, speed)
             if debug:
                 print 'Trying to set fan level to ' + str(new_speed) + ':'
-                
             # set fan speed
-            #if new_speed == 1:
-            #    # handle interval mode
-            #    self.interval_mode = True
-            #    curtime = time.time() * 1000.0
-            #    if self.interval_running:
-            #        if curtime >= self.last_interval_spinup + act_settings.interval_duration:
-            #            self.set_speed(0)
-            #            self.interval_running = False
-            #            self.repoll(min(self.poll_time, act_settings.interval_delay))
-            #        else:
-            #            self.set_speed(act_settings.interval_speed)
-            #            self.repoll(max(0, min(self.poll_time, self.last_interval_spinup + act_settings.interval_duration - curtime)))
-            #    else:
-            #        if curtime >= self.last_interval_spinup + act_settings.interval_duration + act_settings.interval_delay:
-            #            self.last_interval_spinup = curtime
-            #            self.set_speed(act_settings.interval_speed)
-            #            self.interval_running = True
-            #            self.repoll(min(self.poll_time, act_settings.interval_duration))
-            #        else:
-            #            self.set_speed(0)
-            #            self.repoll(max(0, min(self.poll_time, self.last_interval_spinup + act_settings.interval_duration + act_settings.interval_delay - curtime)))
-            #else:
-                # handle normal fan mode
-            #    self.interval_mode = False
-            #    self.interval_running = False
             self.set_speed(new_speed)      
             self.repoll(self.poll_time)
         else:
@@ -341,7 +311,8 @@ def start_fan_control(quiet):
     """daemon start function"""
     
     if not quiet:
-        print 'tpfand ' + build.version + ' - Copyright (C) 2007-2008 Sebastian Urban'
+        print 'tpfand ' + build.version + ' - Copyright (C) 2011-2012 Vladyslav Shtabovenko'
+        print 'Copyright (C) 2007-2008 Sebastian Urban'
         print 'This program comes with ABSOLUTELY NO WARRANTY'
         print
         print 'WARNING: THIS PROGRAM MAY DAMAGE YOUR COMPUTER.'
@@ -355,6 +326,9 @@ def start_fan_control(quiet):
         print "Fatal error: unable to set fanspeed, enable watchdog or read temperature"
         print "             Please make sure you are root and a recent"
         print "             thinkpad_acpi module is loaded with fan_control=1"
+        print "             If thinkpad_acpi is already loaded, check that"
+        print "             /proc/acpi/ibm/thermal exists. Thinkpad models"
+        print "             that doesn't have this file are currently unsupported"
         exit(1)
         
     if os.path.isfile(build.pid_path):

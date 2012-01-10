@@ -1,7 +1,8 @@
 #! /usr/bin/env python
 # -*- coding: utf8 -*-
 #
-# tp-fancontrol - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks
+# tpfanco - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks
+# Copyright (C) 2011-2012 Vladyslav Shtabovenko
 # Copyright (C) 2007-2008 Sebastian Urban
 #
 # This program is free software: you can redistribute it and/or modify
@@ -39,9 +40,6 @@ class Settings(dbus.service.Object):
     sensor_names = { }
     trigger_points = { }
     hysteresis = -1
-    #interval_speed = -1
-    #interval_duration = -1
-    #interval_delay = -1
     
     # hardware product info    
     product_name = None
@@ -105,10 +103,7 @@ class Settings(dbus.service.Object):
             self.sensor_names = { }
             self.trigger_points = { }
             self.hysteresis = -1
-            #self.interval_speed = -1
-            #self.interval_duration = -1
-            #self.interval_delay = -1  
-            self.profile_comment = ""                  
+            self.profile_comment = ""
             for path in profile_file_list:
                 try:
                     # only show comment of profile that matches notebook model best
@@ -209,7 +204,7 @@ class Settings(dbus.service.Object):
                 self.sensor_names[n] = self.sensor_names[n].replace("=", "-").replace("\n", "")
             if n not in self.trigger_points:
                 self.trigger_points[n] = {0: 255}
-        for opt in ['hysteresis']: #, 'interval_speed', 'interval_duration', 'interval_delay']:
+        for opt in ['hysteresis']:
             val = eval('self.' + opt)
             lmin, lmax = self.get_setting_limits(opt)
             if val < lmin or val > lmax:
@@ -234,12 +229,6 @@ class Settings(dbus.service.Object):
         """returns the limits (min, max) of the given option"""
         if opt == 'hysteresis':
             return [0, 10]
-        #elif opt == 'interval_speed':
-        #    return [2, 7]
-        #elif opt == 'interval_duration':
-        #    return [1, 500]      
-        #elif opt == 'interval_delay':
-        #    return [0, 20000]
         else:
             return None
     
@@ -248,10 +237,7 @@ class Settings(dbus.service.Object):
         """returns the settings"""
         ret = {'hysteresis': self.hysteresis,
                'enabled': int(self.enabled),
-               'override_profile': int(self.override_profile)}
-               #'interval_speed': self.interval_speed,
-               #'interval_duration': self.interval_duration,
-               #'interval_delay': self.interval_delay }
+               'override_profile': int(self.override_profile)}       
         return ret
     
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='a{si}', out_signature='')        
@@ -264,16 +250,7 @@ class Settings(dbus.service.Object):
                 self.enabled = bool(set['enabled'])                        
             if 'hysteresis' in set:
                 self.verify_profile_overridden()
-                self.hysteresis = set['hysteresis']
-            #if 'interval_speed' in set:
-            #    self.verify_profile_overridden()
-            #    self.interval_speed = set['interval_speed']
-            #if 'interval_duration' in set:
-            #    self.verify_profile_overridden()
-            #    self.interval_duration = set['interval_duration']
-            #if 'interval_delay' in set:
-            #    self.verify_profile_overridden()
-            #    self.interval_delay = set['interval_delay']
+                self.hysteresis = set['hysteresis']           
         except ValueError, ex:
             print "Error parsing parameters: ", ex
             pass
@@ -294,9 +271,6 @@ class Settings(dbus.service.Object):
 # enabled = [True / False]
 # override_profile = [True / False]
 # hysteresis = [hysteresis temperature difference]
-# interval_speed = [fan speed for interval mode]
-# interval_duration = [duration of fan rotation in interval mode]
-# interval_delay = [delay between fan rotations in interval mode]
 #
 # Trigger point syntax:
 # [sensor-id]. [human readable sensor name] = [temperature]:[fan level] ...
@@ -344,9 +318,6 @@ class Settings(dbus.service.Object):
         
         res += '\n'
         res += "hysteresis = %d\n" % self.hysteresis
-        #res += "interval_speed = %d\n" % self.interval_speed
-        #res += "interval_duration = %f\n" % self.interval_duration
-        #res += "interval_delay = %f\n" % self.interval_delay        
         return res
     
     def read_config(self, path, is_config):
@@ -390,12 +361,6 @@ class Settings(dbus.service.Object):
                             self.enabled = (value == 'True')
                         elif option == 'override_profile' and is_config:
                             self.override_profile = (value == 'True')
-                        #elif option == 'interval_speed' and ((is_config and self.override_profile) or not is_config):
-                        #    self.interval_speed = int(value)
-                        #elif option == 'interval_delay' and ((is_config and self.override_profile) or not is_config):
-                        #    self.interval_delay = float(value)
-                        #elif option == 'interval_duration' and ((is_config and self.override_profile) or not is_config):
-                        #    self.interval_duration = float(value)
                         elif option == 'comment' and not is_config:
                             self.profile_comment = value.replace("\\n", "\n")
                             # verify that comment is valid unicode, otherwise use Latin1 coding

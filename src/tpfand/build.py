@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # tpfanco - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks
@@ -19,6 +19,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import sys
+if not ('/usr/share/pyshared' in sys.path):
+    sys.path.append('/usr/share/pyshared')
+
 # data directory
 data_dir = "/usr/share/tpfand/"
 
@@ -29,5 +33,5 @@ config_path = "/etc/tpfand.conf"
 pid_path = "/var/run/tpfand.pid"
 
 # version
-version = "0.95.2"
+version = "0.95.3"
 

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python
 # -*- coding: utf8 -*-
 #
 # tpfanco - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks
@@ -18,6 +18,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+import sys
+if not ('/usr/share/pyshared' in sys.path):
+    sys.path.append('/usr/share/pyshared')
+
 
 import sys, os, os.path
 import dbus, dbus.service, dbus.mainloop.glib, dbus.glib

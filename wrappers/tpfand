@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python2.7
 # -*- coding: utf8 -*-
 #
 # tpfanco - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks

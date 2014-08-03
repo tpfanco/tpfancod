@@ -4,7 +4,7 @@ After=syslog.target
 
 [Service]
 Type=dbus
-BusName=org.tpfanco.tpfand
+BusName=org.thinkpad.fancontrol.tpfand
 ExecStart=/usr/sbin/tpfand
 PIDFile=/var/run/tpfand.pid
 Restart=always

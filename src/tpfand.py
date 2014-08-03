@@ -22,6 +22,8 @@
 import sys
 if not ('/usr/share/pyshared' in sys.path):
     sys.path.append('/usr/share/pyshared')
+if not ("/usr/lib/python2.7/site-packages" in sys.path):
+    sys.path.append("/usr/lib/python2.7/site-packages")
 
 import tpfand.control
 tpfand.control.main()

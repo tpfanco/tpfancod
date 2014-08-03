@@ -5,7 +5,7 @@ all: man
 man: tpfand.8
 
 tpfand.8: man/tpfand.pod
-	pod2man --section=8 --release=Version\ `cat src/tpfand/build.py | grep "version = " | sed  -e "s/version = \"\(.*\)\"/\1/"` --center "" man/tpfand.pod > tpfand.8
+	pod2man --utf8 --section=8 --release=Version\ `cat src/tpfand/build.py | grep "version = " | sed  -e "s/version = \"\(.*\)\"/\1/"` --center "" man/tpfand.pod > tpfand.8
 
 clean:
 	rm -f tpfand.8

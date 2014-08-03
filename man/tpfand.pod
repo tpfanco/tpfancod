@@ -1,3 +1,4 @@
+=encoding utf8
 =head1 NAME
 
 tpfand - Controls the fan speed of IBM/Lenovo ThinkPad-Notebooks.

@@ -19,17 +19,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os.path
 import sys
+
+import dbus.service
+import dmidecode
+
+import build
 if not ('/usr/share/pyshared' in sys.path):
     sys.path.append('/usr/share/pyshared')
 
-
-import sys, os, os.path
-import dbus, dbus.service, dbus.mainloop.glib, dbus.glib
-import gobject
-import dmidecode
-
-from tpfand import build
 
 class ProfileNotOverriddenException(dbus.DBusException):
     _dbus_error_name = "org.thinkpad.fancontrol.ProfileNotOverriddenException"

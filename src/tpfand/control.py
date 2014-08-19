@@ -23,23 +23,12 @@ import sys
 if not ('/usr/share/pyshared' in sys.path):
     sys.path.append('/usr/share/pyshared')
 
-import sys, os, os.path, time, signal
-import dbus, dbus.service, dbus.mainloop.glib, dbus.glib
+import time
+import dbus.service
 import gobject
 
-from tpfand import build, settings
+import build
 
-IBM_fan = '/proc/acpi/ibm/fan'
-IBM_thermal = '/proc/acpi/ibm/thermal'
-
-#debug
-debug = False
-
-# Configuration
-act_settings = None
-
-# Fan controller
-controller = None
 
 class UnavailableException(dbus.DBusException):
     _dbus_error_name = "org.thinkpad.fancontrol.UnavailableException"    
@@ -64,7 +53,9 @@ class Control(dbus.service.Object):
     # fan on in interval cooling mode
     #interval_running = False        
 
-    def __init__(self, bus, path):
+    def __init__(self, bus, path, act_settings, debug):
+        self.act_settings = act_settings
+        self.debug = debug
         dbus.service.Object.__init__(self, bus, path)
         self.repoll(1)
     
@@ -72,17 +63,17 @@ class Control(dbus.service.Object):
         """sets the fan speed (0=off, 2-8=normal, 254=disengaged, 255=ec, 256=full-speed)"""
         fan_state = self.get_fan_state()
         try:
-            if debug:
+            if self.debug:
                 print '  Rearming fan watchdog timer (+' + str(self.watchdog_time) + ' s)'
                 print '  Current fan level is ' + str(fan_state['level'])
-            fanfile = open(IBM_fan, 'w')
+            fanfile = open(build.ibm_fan, 'w')
             fanfile.write("watchdog %d" % self.watchdog_time)
             fanfile.flush()            
             if speed == fan_state['level']:
-                if debug:
+                if self.debug:
                     print '  -> Keeping the current fan level unchanged'
             else:
-                if debug:
+                if self.debug:
                     print '  -> Setting fan level to ' + str(speed)
                 if speed == 0:
                     fanfile.write('disable')
@@ -115,7 +106,7 @@ class Control(dbus.service.Object):
     def get_temperatures(self):
         """returns list of current sensor readings, +/-128 or 0 means sensor is disconnected"""
         try:
-            tempfile = open(IBM_thermal, 'r')
+            tempfile = open(build.ibm_thermal, 'r')
             elements = tempfile.readline().split()[1:]
             tempfile.close()
             return map(int, elements)
@@ -132,7 +123,7 @@ class Control(dbus.service.Object):
     def get_fan_state(self):
         """Returns current (fan_level, fan_rpm)"""
         try:
-            fanfile = open(IBM_fan, 'r')
+            fanfile = open(build.ibm_fan, 'r')
             for line in fanfile.readlines():
                 key, value = line.split(':')
                 if key == 'speed':
@@ -194,14 +185,14 @@ class Control(dbus.service.Object):
         """main fan control routine"""
         # get the current fan level
         fan_state = self.get_fan_state()
-        
-        if debug:
-              print
-              print str(time.strftime("%H:%M:%S")) + ': Polling the sensors'
-              print 'Current fan level: ' + str(fan_state['level']) + ' (' + str(fan_state['rpm']) + ' RPM)'
-       
-        if act_settings.enabled:
-                        
+
+        if self.debug:
+            print
+            print str(time.strftime("%H:%M:%S")) + ': Polling the sensors'
+            print 'Current fan level: ' + str(fan_state['level']) + ' (' + str(fan_state['rpm']) + ' RPM)'
+
+        if self.act_settings.enabled:
+
             # probing the disengaged mode
             #if level not in (0,1,254,255,256):
             #    if debug:
@@ -220,16 +211,16 @@ class Control(dbus.service.Object):
                 return False
 
             new_speed = 0
-            if debug:
-                        print 'Current sensor values:'
+            if self.debug:
+                print 'Current sensor values:'
             for tid in range(0, len(temps)):
                 temp = temps[tid]
                 # value is +/-128 or 0, if sensor is disconnected
                 if abs(temp) != 128 and abs(temp) != 0:
-                    points = act_settings.trigger_points[tid]
+                    points = self.act_settings.trigger_points[tid]
                     speed = 0
-                    
-                    if debug:                        
+
+                    if self.debug:
                         print '    Sensor ' + str(tid) + ': ' + str(temp)
                     # check if temperature is above hysteresis shutdown point
                     if tid in self.current_trip_temps:
@@ -243,12 +234,12 @@ class Control(dbus.service.Object):
                     for trigger_temp, trigger_speed in points.iteritems():
                         if temp >= trigger_temp and speed < trigger_speed:
                             self.current_trip_temps[
-                                tid] = trigger_temp - act_settings.hysteresis
+                                tid] = trigger_temp - self.act_settings.hysteresis
                             self.current_trip_speeds[tid] = trigger_speed
                             speed = trigger_speed
                     
                     new_speed = max(new_speed, speed)
-            if debug:
+            if self.debug:
                 print 'Trying to set fan level to ' + str(new_speed) + ':'
             # set fan speed
             self.set_speed(new_speed)      
@@ -260,144 +251,3 @@ class Control(dbus.service.Object):
         
         # remove current timer
         return False
-             
-def daemon_main():
-    """daemon entry point"""  
-    global controller, mainloop, act_settings  
-     
-    # register SIGTERM handler
-    signal.signal(signal.SIGTERM, term_handler)    
-    
-    # register d-bus service
-    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-    system_bus = dbus.SystemBus()
-    name = dbus.service.BusName("org.thinkpad.fancontrol.tpfand", system_bus)
-
-    # create and load configuration
-    act_settings = settings.Settings(system_bus, '/Settings')
-
-    # create controller
-    controller = Control(system_bus, '/Control')                  
-
-    # start glib main loop          
-    mainloop = gobject.MainLoop()  
-    mainloop.run()  
-
-def term_handler(signum, frame):
-    """Handles SIGTERM"""
-    controller.set_speed(255)
-    try:
-        os.remove(build.pid_path)
-    except:
-        pass    
-    mainloop.quit()        
-         
-def is_system_suitable():
-    """returns True iff fan speed setting, watchdog and thermal reading is supported by kernel and 
-       we have write permissions"""
-    try:
-        fanfile = open(IBM_fan, 'w')
-        fanfile.write('level auto')
-        fanfile.flush()
-        fanfile.close()
-        fanfile = open(IBM_fan, 'w')
-        fanfile.write('watchdog 5')
-        fanfile.flush()
-        fanfile.close()
-        
-        tempfile = open(IBM_thermal, 'r')
-        tempfile.readline()
-        tempfile.close()
-        return True
-    except IOError:
-        return False         
-         
-def start_fan_control(quiet):
-    """daemon start function"""
-    
-    if not quiet:
-        print 'tpfand ' + build.version + ' - Copyright (C) 2011-2012 Vladyslav Shtabovenko'
-        print 'Copyright (C) 2007-2008 Sebastian Urban'
-        print 'This program comes with ABSOLUTELY NO WARRANTY'
-        print
-        print 'WARNING: THIS PROGRAM MAY DAMAGE YOUR COMPUTER.'
-        print '         PROCEED ONLY IF YOU KNOW HOW TO MONITOR SYSTEM TEMPERATURE.'
-        print
-               
-    if debug:
-        print 'Running in debug mode'
-    
-    if not is_system_suitable():
-        print "Fatal error: unable to set fanspeed, enable watchdog or read temperature"
-        print "             Please make sure you are root and a recent"
-        print "             thinkpad_acpi module is loaded with fan_control=1"
-        print "             If thinkpad_acpi is already loaded, check that"
-        print "             /proc/acpi/ibm/thermal exists. Thinkpad models"
-        print "             that doesn't have this file are currently unsupported"
-        exit(1)
-        
-    if os.path.isfile(build.pid_path):
-        print "Fatal error: already running or " + build.pid_path + " left behind"
-        exit(1)
-                   
-    # go into daemon mode
-    daemonize()
-    
-def daemonize():
-    """ don't go into daemon mode if debug mode is active """
-    if not debug:
-        """go into daemon mode"""   
-        # from: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66012
-        # do the UNIX double-fork magic, see Stevens' "Advanced 
-        # Programming in the UNIX Environment" for details (ISBN 0201563177)
-        try: 
-            pid = os.fork() 
-            if pid > 0:
-                # exit first parent
-                sys.exit(0) 
-        except OSError, e: 
-            print >>sys.stderr, "fork #1 failed: %d (%s)" % (e.errno, e.strerror) 
-            sys.exit(1)
-
-        # decouple from parent environment
-        os.chdir("/") 
-        os.setsid() 
-        os.umask(0) 
-
-        # do second fork
-        try: 
-            pid = os.fork() 
-            if pid > 0:
-                sys.exit(0) 
-        except OSError, e: 
-            print >>sys.stderr, "fork #2 failed: %d (%s)" % (e.errno, e.strerror) 
-            sys.exit(1) 
-
-        # write pid file
-        try:
-            pidfile = open(build.pid_path, 'w')
-            pidfile.write(str(os.getpid()) + "\n")
-            pidfile.close()
-        except IOError:
-            print >>sys.stderr, "could not write pid-file: ", build.pid_path
-            sys.exit(1)
-    
-    # start the daemon main loop
-    daemon_main()   
-    
-    
-def main():
-    quiet = False
-    global debug
-    
-    if "--quiet" in sys.argv:
-        quiet = True
-    
-    if "--debug" in sys.argv:
-        debug = True
-        
-    start_fan_control(quiet)     
-
-if __name__ == "__main__":
-    main()
-    

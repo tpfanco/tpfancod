@@ -23,6 +23,9 @@ import sys
 if not ('/usr/share/pyshared' in sys.path):
     sys.path.append('/usr/share/pyshared')
 
+ibm_fan = '/proc/acpi/ibm/fan'
+ibm_thermal = '/proc/acpi/ibm/thermal'
+
 # data directory
 data_dir = "/usr/share/tpfand/"
 
@@ -32,6 +35,6 @@ config_path = "/etc/tpfand.conf"
 # path to pid file
 pid_path = "/var/run/tpfand.pid"
 
+
 # version
 version = "0.95.3"
-

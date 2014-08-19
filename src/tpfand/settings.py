@@ -180,10 +180,10 @@ class Settings(dbus.service.Object):
         return self.sensor_names
     
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='a{is}', out_signature='')
-    def set_sensor_names(self, set):
+    def set_sensor_names(self, tset):
         """sets the sensor names"""
         self.verify_profile_overridden()
-        self.sensor_names = set
+        self.sensor_names = tset
         self.verify()
         self.save()
         
@@ -193,10 +193,10 @@ class Settings(dbus.service.Object):
         return self.trigger_points
     
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='a{ia{ii}}', out_signature='')
-    def set_trigger_points(self, set):
+    def set_trigger_points(self, tset):
         """sets the temperature trigger points for the sensors"""
         self.verify_profile_overridden()
-        self.trigger_points = set
+        self.trigger_points = tset
         self.verify()
         self.save()
         
@@ -244,18 +244,18 @@ class Settings(dbus.service.Object):
                'enabled': int(self.enabled),
                'override_profile': int(self.override_profile)}       
         return ret
-    
-    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='a{si}', out_signature='')        
-    def set_settings(self, set):
+
+    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='a{si}', out_signature='')
+    def set_settings(self, tset):
         """sets the settings"""
         try:
-            if 'override_profile' in set:
-                self.override_profile = bool(set['override_profile'])   
-            if 'enabled' in set:
-                self.enabled = bool(set['enabled'])                        
-            if 'hysteresis' in set:
+            if 'override_profile' in tset:
+                self.override_profile = bool(tset['override_profile'])
+            if 'enabled' in tset:
+                self.enabled = bool(tset['enabled'])
+            if 'hysteresis' in tset:
                 self.verify_profile_overridden()
-                self.hysteresis = set['hysteresis']           
+                self.hysteresis = tset['hysteresis']
         except ValueError, ex:
             print "Error parsing parameters: ", ex
             pass
@@ -268,8 +268,8 @@ class Settings(dbus.service.Object):
     
     def write_config(self, path):
         """Writes a fan profile file"""
-        file = open(path, 'w')
-        file.write("""#
+        profile_file = open(path, 'w')
+        profile_file.write("""#
 # tp-fancontrol configuration file
 #
 # Options:
@@ -290,30 +290,31 @@ class Settings(dbus.service.Object):
 #
 
 """)
-        file.write("enabled = %s\n" % str(self.enabled))
-        file.write("override_profile = %s\n" % str(self.override_profile))
-        file.write("\n")
-                    
+        profile_file.write("enabled = %s\n" % str(self.enabled))
+        profile_file.write("override_profile = %s\n" %
+                           str(self.override_profile))
+        profile_file.write("\n")
+
         if self.override_profile:
-            file.write(self.get_profile_string())
-            
-        file.close()
-    
-    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='s')  
+            profile_file.write(self.get_profile_string())
+
+        profile_file.close()
+
+    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='s')
     def get_profile_string(self):
         """returns the current profile as a string"""
         res = ""
         ids = set(self.sensor_names.keys())
         ids.union(set(self.trigger_points.keys()))
-        for id in ids:
-            if id in self.sensor_names:
-                name = self.sensor_names[id]
+        for tid in ids:
+            if tid in self.sensor_names:
+                name = self.sensor_names[tid]
             else:
                 name = ""
-            line = str(id) + ". " + name
-            if id in self.trigger_points:
+            line = str(tid) + ". " + name
+            if tid in self.trigger_points:
                 line += " = "
-                points = self.trigger_points[id]
+                points = self.trigger_points[tid]
                 temps = points.keys()
                 temps.sort()
                 for temp in temps:
@@ -327,17 +328,17 @@ class Settings(dbus.service.Object):
     
     def read_config(self, path, is_config):
         """Reads a fan profile file"""
-        file = open(path, 'r')
-        for line in file.readlines():
+        profile_file = open(path, 'r')
+        for line in profile_file.readlines():
             line = line.split('#')[0].strip()
             if len(line) > 0:
                 try:
                     if (line.count('.') and line.count('=') and line.find('.') < line.find('=')) or (line.count('.') and not line.count('=')):
-                        if (is_config and self.override_profile) or (not is_config and not self.override_profile): 
-                            id, rest = line.split('.', 1)
-                            id = id.strip()
-                            id = int(id)
-                                
+                        if (is_config and self.override_profile) or (not is_config and not self.override_profile):
+                            tid, rest = line.split('.', 1)
+                            tid = tid.strip()
+                            tid = int(tid)
+
                             if rest.count('='):
                                 name, triggers = rest.split('=', 1)
                                 name = name.strip()
@@ -349,13 +350,13 @@ class Settings(dbus.service.Object):
                                         temp = int(temp)
                                         points[temp] = int(level)
                                 if len(points) > 0:
-                                    self.trigger_points[id] = points                                                                                                                     
+                                    self.trigger_points[tid] = points
                             else:
                                 name = rest.strip()
                                 triggers = None
                             if len(name) > 0:
-                                self.sensor_names[id] = name
-                            
+                                self.sensor_names[tid] = name
+
                     elif line.count('='):
                         option, value = line.split('=', 1)
                         option = option.strip()
@@ -376,4 +377,4 @@ class Settings(dbus.service.Object):
                 except Exception, e:
                     print "Error parsing line: %s" % line
                     print e
-        file.close()        
+        profile_file.close()

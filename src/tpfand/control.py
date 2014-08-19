@@ -222,28 +222,29 @@ class Control(dbus.service.Object):
             new_speed = 0
             if debug:
                         print 'Current sensor values:'
-            for id in range(0, len(temps)):
-                temp = temps[id]                
+            for tid in range(0, len(temps)):
+                temp = temps[tid]
                 # value is +/-128 or 0, if sensor is disconnected
                 if abs(temp) != 128 and abs(temp) != 0:
-                    points = act_settings.trigger_points[id]                    
+                    points = act_settings.trigger_points[tid]
                     speed = 0
                     
                     if debug:                        
-                        print '    Sensor ' + str(id) +': ' + str(temp)                    
+                        print '    Sensor ' + str(tid) + ': ' + str(temp)
                     # check if temperature is above hysteresis shutdown point
-                    if id in self.current_trip_temps:
-                        if temp >= self.current_trip_temps[id]:
-                            speed = self.current_trip_speeds[id]
+                    if tid in self.current_trip_temps:
+                        if temp >= self.current_trip_temps[tid]:
+                            speed = self.current_trip_speeds[tid]
                         else:
-                            del self.current_trip_temps[id]
-                            del self.current_trip_speeds[id]
-                            
+                            del self.current_trip_temps[tid]
+                            del self.current_trip_speeds[tid]
+
                     # check if temperature is over trigger point
                     for trigger_temp, trigger_speed in points.iteritems():
                         if temp >= trigger_temp and speed < trigger_speed:
-                            self.current_trip_temps[id] = trigger_temp - act_settings.hysteresis
-                            self.current_trip_speeds[id] = trigger_speed
+                            self.current_trip_temps[
+                                tid] = trigger_temp - act_settings.hysteresis
+                            self.current_trip_speeds[tid] = trigger_speed
                             speed = trigger_speed
                     
                     new_speed = max(new_speed, speed)

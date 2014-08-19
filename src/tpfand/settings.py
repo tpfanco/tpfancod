@@ -33,28 +33,30 @@ if not ('/usr/share/pyshared' in sys.path):
 class ProfileNotOverriddenException(dbus.DBusException):
     _dbus_error_name = "org.thinkpad.fancontrol.ProfileNotOverriddenException"
 
+
 class Settings(dbus.service.Object):
+
     """profile and config settings"""
-    
+
     # user options
-    enabled = False    
+    enabled = False
     override_profile = False
-    
+
     # profile / user overrideable options
-    sensor_names = { }
-    trigger_points = { }
+    sensor_names = {}
+    trigger_points = {}
     hysteresis = -1
-    
-    # hardware product info    
+
+    # hardware product info
     product_name = None
     product_id = None
     product_pretty_vendor = None
     product_pretty_name = None
     product_pretty_id = None
-    
+
     # profile info
-    loaded_profiles = [ ]
-    
+    loaded_profiles = []
+
     # comments for the last loaded profile
     profile_comment = ""
 
@@ -62,21 +64,21 @@ class Settings(dbus.service.Object):
         dbus.service.Object.__init__(self, bus, path)
         self.read_model_info()
         self.load()
-        
-    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='a{ss}') 
+
+    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='a{ss}')
     def get_model_info(self):
         """returns hardware model info"""
         return {'vendor': self.product_pretty_vendor,
                 'name': self.product_pretty_name,
                 'id': self.product_pretty_id,
                 'profile_name': self.product_name,
-                'profile_id': self.product_id }
-        
-    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='as') 
+                'profile_id': self.product_id}
+
+    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='as')
     def get_loaded_profiles(self):
         """returns a list of the given profiles"""
-        return self.loaded_profiles  
-    
+        return self.loaded_profiles
+
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='s')
     def get_profile_comment(self):
         """returns the comment for the last loaded profile"""
@@ -84,62 +86,63 @@ class Settings(dbus.service.Object):
             return ""
         else:
             return self.profile_comment
-    
-    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='b') 
+
+    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='b')
     def is_profile_exactly_matched(self):
-        """returns True if profile exactly matches hardware"""     
+        """returns True if profile exactly matches hardware"""
         return self.id_match
-    
+
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='')
     def load(self):
         """loads profile and config form disk"""
-        self.enabled = False    
+        self.enabled = False
         self.override_profile = False
         if os.path.isfile(build.config_path):
             self.read_config(build.config_path, True)
         self.load_profile()
         self.verify()
-                
+
     def load_profile(self):
         """loads profile from disk"""
         profile_file_list, self.loaded_profiles, self.id_match = self.get_profile_file_list()
-        if not self.override_profile:  
-            self.sensor_names = { }
-            self.trigger_points = { }
+        if not self.override_profile:
+            self.sensor_names = {}
+            self.trigger_points = {}
             self.hysteresis = -1
             self.profile_comment = ""
             for path in profile_file_list:
                 try:
-                    # only show comment of profile that matches notebook model best
+                    # only show comment of profile that matches notebook model
+                    # best
                     self.profile_comment = ""
-                    
+
                     self.read_config(path, False)
                 except Exception, ex:
-                    print "Error loading ", path, ": ", ex        
-            
-    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='') 
+                    print "Error loading ", path, ": ", ex
+
+    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='')
     def save(self):
         """saves config to disk"""
         self.write_config(build.config_path)
-        
+
     def get_profile_file_list(self):
         """returns a list of profile files to load for this system"""
         model_dir = build.data_dir + 'models/'
         product_id_dir = model_dir + 'by-id/'
         product_name_dir = model_dir + 'by-name/'
-                
+
         # generic profile
         files = [model_dir + "generic"]
-        profiles = [ "generic" ]
-        
+        profiles = ["generic"]
+
         # match parts of product name
         product_path = product_name_dir + self.product_name
-        for n in range(len(product_name_dir)+1, len(product_path)):
+        for n in range(len(product_name_dir) + 1, len(product_path)):
             path = product_path[0:n]
             if os.path.isfile(path):
                 files.append(path)
                 profiles.append(path[len(model_dir):])
-                
+
         # try matching model id
         id_match = False
         model_path = product_id_dir + self.product_id
@@ -147,21 +150,22 @@ class Settings(dbus.service.Object):
             files.append(model_path)
             profiles.append(model_path[len(model_dir):])
             id_match = True
-                        
+
         return files, profiles, id_match
-        
+
     def read_model_info(self):
         """reads model info using dmidecode module"""
         try:
-            current_system = dmidecode.system()                   
+            current_system = dmidecode.system()
             hw_product = current_system['0x0001']['data']['Product Name']
             hw_vendor = current_system['0x0001']['data']['Manufacturer']
             hw_version = current_system['0x0001']['data']['Version']
             product_id = hw_vendor + "_" + hw_product
             self.product_id = product_id.lower()
             product_name = hw_vendor.lower() + "_" + hw_version.lower()
-            self.product_name = product_name.lower().replace('/', '-').replace(' ', '_')
-            
+            self.product_name = product_name.lower().replace(
+                '/', '-').replace(' ', '_')
+
             self.product_pretty_vendor = hw_vendor
             self.product_pretty_name = hw_version
             self.product_pretty_id = hw_product
@@ -171,13 +175,13 @@ class Settings(dbus.service.Object):
             self.product_name = ''
             self.product_pretty_vendor = ''
             self.product_pretty_name = ''
-            self.product_pretty_id = ''   
-                
+            self.product_pretty_id = ''
+
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='a{is}')
     def get_sensor_names(self):
         """returns the sensor names"""
         return self.sensor_names
-    
+
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='a{is}', out_signature='')
     def set_sensor_names(self, tset):
         """sets the sensor names"""
@@ -185,12 +189,12 @@ class Settings(dbus.service.Object):
         self.sensor_names = tset
         self.verify()
         self.save()
-        
-    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='a{ia{ii}}')    
+
+    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='a{ia{ii}}')
     def get_trigger_points(self):
         """returns the temperature trigger points for the sensors"""
         return self.trigger_points
-    
+
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='a{ia{ii}}', out_signature='')
     def set_trigger_points(self, tset):
         """sets the temperature trigger points for the sensors"""
@@ -198,14 +202,15 @@ class Settings(dbus.service.Object):
         self.trigger_points = tset
         self.verify()
         self.save()
-        
+
     def verify(self):
         """Verifies that all settings a valid"""
         for n in range(0, self.get_sensor_count()):
             if n not in self.sensor_names or len(self.sensor_names[n].strip()) == 0:
                 self.sensor_names[n] = "Sensor " + str(n)
             else:
-                self.sensor_names[n] = self.sensor_names[n].replace("=", "-").replace("\n", "")
+                self.sensor_names[n] = self.sensor_names[
+                    n].replace("=", "-").replace("\n", "")
             if n not in self.trigger_points:
                 self.trigger_points[n] = {0: 255}
         for opt in ['hysteresis']:
@@ -217,17 +222,17 @@ class Settings(dbus.service.Object):
                 if val > lmax:
                     val = lmax
                 exec 'self.' + opt + ' = ' + str(val)
-                
+
     def verify_profile_overridden(self):
         """verifies that override_profile is true, raises ProfileNotOverriddenException if it is not"""
         if not self.override_profile:
             raise ProfileNotOverriddenException()
-                    
-    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='i')        
+
+    @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='i')
     def get_sensor_count(self):
         """returns the count of sensors"""
         return 16
-    
+
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='s', out_signature='ad')
     def get_setting_limits(self, opt):
         """returns the limits (min, max) of the given option"""
@@ -235,13 +240,13 @@ class Settings(dbus.service.Object):
             return [0, 10]
         else:
             return None
-    
+
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='', out_signature='a{si}')
     def get_settings(self):
         """returns the settings"""
         ret = {'hysteresis': self.hysteresis,
                'enabled': int(self.enabled),
-               'override_profile': int(self.override_profile)}       
+               'override_profile': int(self.override_profile)}
         return ret
 
     @dbus.service.method("org.thinkpad.fancontrol.Settings", in_signature='a{si}', out_signature='')
@@ -264,7 +269,7 @@ class Settings(dbus.service.Object):
             if not self.override_profile:
                 self.load_profile()
                 self.verify()
-    
+
     def write_config(self, path):
         """Writes a fan profile file"""
         profile_file = open(path, 'w')
@@ -320,11 +325,11 @@ class Settings(dbus.service.Object):
                     level = points[temp]
                     line += "%d:%d " % (temp, level)
             res += line + '\n'
-        
+
         res += '\n'
         res += "hysteresis = %d\n" % self.hysteresis
         return res
-    
+
     def read_config(self, path, is_config):
         """Reads a fan profile file"""
         profile_file = open(path, 'r')
@@ -341,7 +346,7 @@ class Settings(dbus.service.Object):
                             if rest.count('='):
                                 name, triggers = rest.split('=', 1)
                                 name = name.strip()
-                                points = { }
+                                points = {}
                                 for trigger in triggers.strip().split(' '):
                                     trigger = trigger.strip()
                                     if len(trigger) > 0:
@@ -368,11 +373,13 @@ class Settings(dbus.service.Object):
                             self.override_profile = (value == 'True')
                         elif option == 'comment' and not is_config:
                             self.profile_comment = value.replace("\\n", "\n")
-                            # verify that comment is valid unicode, otherwise use Latin1 coding
+                            # verify that comment is valid unicode, otherwise
+                            # use Latin1 coding
                             try:
                                 unicode(self.profile_comment)
                             except UnicodeDecodeError:
-                                self.profile_comment = self.profile_comment.decode("latin1")
+                                self.profile_comment = self.profile_comment.decode(
+                                    "latin1")
                 except Exception, e:
                     print "Error parsing line: %s" % line
                     print e

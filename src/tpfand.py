@@ -22,7 +22,7 @@
 import os.path
 import signal
 import sys
-
+import argparse
 import dbus.mainloop.glib
 import gobject
 
@@ -35,14 +35,29 @@ if not ("/usr/lib/python2.7/site-packages" in sys.path):
 
 class Tpfand(object):
 
-    quiet = False
     debug = False
+    quiet = False
+    noibmthermal = False
 
-    def __init__(self, quiet, debug):
-        self.quiet = quiet
-        self.debug = debug
-
+    def __init__(self):
+        self.parse_command_line_args()
         self.start_fan_control()
+
+    def parse_command_line_args(self):
+        """ evaluate command line arguments """
+        parser = argparse.ArgumentParser()
+
+        parser.add_argument('-d', '--debug', help='enable debugging output',
+                            action="store_true")
+        parser.add_argument('-n', '--noibmthermal', help='use hwmon sensors even if /proc/acpi/ibm/thermal is present',
+                            action="store_true")
+        parser.add_argument('-q', '--quiet', help='minimize console output',
+                            action="store_true")
+        args = parser.parse_args()
+
+        self.debug = args.debug
+        self.quiet = args.quiet
+        self.noibmthermal = args.noibmthermal
 
     def start_fan_control(self):
         """daemon start function"""
@@ -173,15 +188,8 @@ class Tpfand(object):
 
 
 def main():
-    quiet = False
-    debug = False
 
-    if "--quiet" in sys.argv:
-        quiet = True
-
-    if "--debug" in sys.argv:
-        debug = True
-    app = Tpfand(quiet, debug)
+    app = Tpfand()
 
 if __name__ == "__main__":
     main()

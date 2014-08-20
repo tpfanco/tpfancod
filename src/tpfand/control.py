@@ -2,7 +2,7 @@
 # -*- coding: utf8 -*-
 #
 # tpfanco - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks
-# Copyright (C) 2011-2012 Vladyslav Shtabovenko
+# Copyright (C) 2011-2014 Vladyslav Shtabovenko
 # Copyright (C) 2007-2009 Sebastian Urban
 #
 # This program is free software: you can redistribute it and/or modify

@@ -20,13 +20,9 @@
 #
 
 import sys
-if not ('/usr/share/pyshared' in sys.path):
-    sys.path.append('/usr/share/pyshared')
-
 import time
 import dbus.service
 import gobject
-
 import build
 
 

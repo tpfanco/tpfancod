@@ -19,10 +19,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys
-if not ('/usr/share/pyshared' in sys.path):
-    sys.path.append('/usr/share/pyshared')
-
 ibm_fan = '/proc/acpi/ibm/fan'
 ibm_thermal = '/proc/acpi/ibm/thermal'
 

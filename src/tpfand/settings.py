@@ -21,13 +21,9 @@
 
 import os.path
 import sys
-
 import dbus.service
 import dmidecode
-
 import build
-if not ('/usr/share/pyshared' in sys.path):
-    sys.path.append('/usr/share/pyshared')
 
 
 class ProfileNotOverriddenException(dbus.DBusException):

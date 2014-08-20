@@ -23,13 +23,13 @@ ibm_fan = '/proc/acpi/ibm/fan'
 ibm_thermal = '/proc/acpi/ibm/thermal'
 
 # data directory
-data_dir = "/usr/share/tpfand/"
+data_dir = '/usr/share/tpfand/'
 
 # path to config file
-config_path = "/etc/tpfand.conf"
+config_path = '/etc/tpfand.conf'
 
 # path to pid file
-pid_path = "/var/run/tpfand.pid"
+pid_path = '/var/run/tpfand.pid'
 
 
 # version

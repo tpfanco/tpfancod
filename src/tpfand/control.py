@@ -27,7 +27,7 @@ import build
 
 
 class UnavailableException(dbus.DBusException):
-    _dbus_error_name = "org.thinkpad.fancontrol.UnavailableException"
+    _dbus_error_name = 'org.thinkpad.fancontrol.UnavailableException'
 
 
 class Control(dbus.service.Object):
@@ -65,7 +65,7 @@ class Control(dbus.service.Object):
                 print '  Rearming fan watchdog timer (+' + str(self.watchdog_time) + ' s)'
                 print '  Current fan level is ' + str(fan_state['level'])
             fanfile = open(build.ibm_fan, 'w')
-            fanfile.write("watchdog %d" % self.watchdog_time)
+            fanfile.write('watchdog %d' % self.watchdog_time)
             fanfile.flush()
             if speed == fan_state['level']:
                 if self.debug:
@@ -79,13 +79,13 @@ class Control(dbus.service.Object):
                     fanfile.write('enable')
                     fanfile.flush()
                     if speed == 254:
-                        fanfile.write("level disengaged")
+                        fanfile.write('level disengaged')
                     if speed == 255:
-                        fanfile.write("level auto")
+                        fanfile.write('level auto')
                     elif speed == 256:
-                        fanfile.write("level full-speed")
+                        fanfile.write('level full-speed')
                     else:
-                        fanfile.write("level %d" % (speed - 1))
+                        fanfile.write('level %d' % (speed - 1))
             fanfile.flush()
         except IOError:
             # sometimes write fails during suspend/resume
@@ -96,7 +96,7 @@ class Control(dbus.service.Object):
             except:
                 pass
 
-    @dbus.service.method("org.thinkpad.fancontrol.Control", in_signature='', out_signature='s')
+    @dbus.service.method('org.thinkpad.fancontrol.Control', in_signature='', out_signature='s')
     def get_version(self):
         return build.version
 
@@ -187,7 +187,7 @@ class Control(dbus.service.Object):
 
         if self.debug:
             print
-            print str(time.strftime("%H:%M:%S")) + ': Polling the sensors'
+            print str(time.strftime('%H:%M:%S')) + ': Polling the sensors'
             print 'Current fan level: ' + str(fan_state['level']) + ' (' + str(fan_state['rpm']) + ' RPM)'
 
         if self.act_settings.enabled:

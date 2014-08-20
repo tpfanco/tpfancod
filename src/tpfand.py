@@ -35,6 +35,8 @@ if not ('/usr/lib/python2.7/site-packages' in sys.path):
 
 class Tpfand(object):
 
+    """main tpfand process"""
+
     debug = False
     quiet = False
     noibmthermal = False
@@ -44,7 +46,8 @@ class Tpfand(object):
         self.start_fan_control()
 
     def parse_command_line_args(self):
-        """ evaluate command line arguments """
+        """evaluate command line arguments"""
+
         parser = argparse.ArgumentParser()
 
         parser.add_argument('-d', '--debug', help='enable debugging output',
@@ -111,8 +114,9 @@ class Tpfand(object):
             return False
 
     def daemonize(self):
-        """ don't go into daemon mode if debug mode is active """
-        if not self.debug:
+        """turns the current process into a daemon"""
+
+        if not self.debug:  # don't go into daemon mode if debug mode is active
             """go into daemon mode"""
             # from: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66012
             # do the UNIX double-fork magic, see Stevens' "Advanced
@@ -120,8 +124,7 @@ class Tpfand(object):
             # 0201563177)
             try:
                 pid = os.fork()
-                if pid > 0:
-                    # exit first parent
+                if pid > 0:  # exit first parent
                     sys.exit(0)
             except OSError, e:
                 print >>sys.stderr, 'fork #1 failed: %d (%s)' % (
@@ -178,7 +181,7 @@ class Tpfand(object):
         mainloop.run()
 
     def term_handler(self, signum, frame):
-        """Handles SIGTERM"""
+        """handles SIGTERM"""
         controller.set_speed(255)
         try:
             os.remove(build.pid_path)

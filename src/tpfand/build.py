@@ -19,7 +19,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# fan control and speed
 ibm_fan = '/proc/acpi/ibm/fan'
+
+# standard thermal sensors for ThinkPads
 ibm_thermal = '/proc/acpi/ibm/thermal'
 
 # data directory

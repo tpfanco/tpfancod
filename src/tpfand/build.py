@@ -33,4 +33,4 @@ pid_path = '/var/run/tpfand.pid'
 
 
 # version
-version = "0.95.3"
+version = '1.0.0'

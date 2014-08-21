@@ -23,7 +23,6 @@ import sys
 import time
 import dbus.service
 import gobject
-import build
 
 
 class UnavailableException(dbus.DBusException):
@@ -34,12 +33,6 @@ class Control(dbus.service.Object):
 
     """fan controller"""
 
-    # poll time
-    poll_time = 3500
-    # kernel watchdog time
-    # the thinkpad_acpi watchdog accepts intervals between 1 and 120 seconds
-    # for safety reasons one shouldn't use values higher than 5 seconds
-    watchdog_time = 5
     # value that temperature has to fall below to slow down fan
     current_trip_temps = {}
     # current fan speeds required by sensor readings
@@ -51,9 +44,8 @@ class Control(dbus.service.Object):
     # fan on in interval cooling mode
     #interval_running = False
 
-    def __init__(self, bus, path, act_settings, debug):
+    def __init__(self, bus, path, act_settings):
         self.act_settings = act_settings
-        self.debug = debug
         dbus.service.Object.__init__(self, bus, path)
         self.repoll(1)
 
@@ -61,17 +53,17 @@ class Control(dbus.service.Object):
         """sets the fan speed (0=off, 2-8=normal, 254=disengaged, 255=ec, 256=full-speed)"""
         fan_state = self.get_fan_state()
         try:
-            if self.debug:
-                print '  Rearming fan watchdog timer (+' + str(self.watchdog_time) + ' s)'
+            if self.act_settings.debug:
+                print '  Rearming fan watchdog timer (+' + str(self.act_settings.watchdog_time) + ' s)'
                 print '  Current fan level is ' + str(fan_state['level'])
-            fanfile = open(build.ibm_fan, 'w')
-            fanfile.write('watchdog %d' % self.watchdog_time)
+            fanfile = open(self.act_settings.ibm_fan, 'w')
+            fanfile.write('watchdog %d' % self.act_settings.watchdog_time)
             fanfile.flush()
             if speed == fan_state['level']:
-                if self.debug:
+                if self.act_settings.debug:
                     print '  -> Keeping the current fan level unchanged'
             else:
-                if self.debug:
+                if self.act_settings.debug:
                     print '  -> Setting fan level to ' + str(speed)
                 if speed == 0:
                     fanfile.write('disable')
@@ -98,13 +90,13 @@ class Control(dbus.service.Object):
 
     @dbus.service.method('org.thinkpad.fancontrol.Control', in_signature='', out_signature='s')
     def get_version(self):
-        return build.version
+        return self.act_settings.version
 
     @dbus.service.method('org.thinkpad.fancontrol.Control', in_signature='', out_signature='ai')
     def get_temperatures(self):
         """returns list of current sensor readings, +/-128 or 0 means sensor is disconnected"""
         try:
-            tempfile = open(build.ibm_thermal, 'r')
+            tempfile = open(self.act_settings.ibm_thermal, 'r')
             elements = tempfile.readline().split()[1:]
             tempfile.close()
             return map(int, elements)
@@ -121,7 +113,7 @@ class Control(dbus.service.Object):
     def get_fan_state(self):
         """Returns current (fan_level, fan_rpm)"""
         try:
-            fanfile = open(build.ibm_fan, 'r')
+            fanfile = open(self.act_settings.ibm_fan, 'r')
             for line in fanfile.readlines():
                 key, value = line.split(':')
                 if key == 'speed':
@@ -175,8 +167,8 @@ class Control(dbus.service.Object):
         # out
         if ival < 1:
             ival = 1
-        if ival > self.watchdog_time * 1000:
-            ival = self.watchdog_time * 1000
+        if ival > self.act_settings.watchdog_time * 1000:
+            ival = self.act_settings.watchdog_time * 1000
 
         gobject.timeout_add(ival, self.poll)
 
@@ -185,7 +177,7 @@ class Control(dbus.service.Object):
         # get the current fan level
         fan_state = self.get_fan_state()
 
-        if self.debug:
+        if self.act_settings.debug:
             print
             print str(time.strftime('%H:%M:%S')) + ': Polling the sensors'
             print 'Current fan level: ' + str(fan_state['level']) + ' (' + str(fan_state['rpm']) + ' RPM)'
@@ -206,11 +198,11 @@ class Control(dbus.service.Object):
             except UnavailableException:
                 # temperature read failed
                 self.set_speed(255)
-                self.repoll(self.poll_time)
+                self.repoll(self.act_settings.poll_time)
                 return False
 
             new_speed = 0
-            if self.debug:
+            if self.act_settings.debug:
                 print 'Current sensor values:'
             for tid in range(0, len(temps)):
                 temp = temps[tid]
@@ -219,7 +211,7 @@ class Control(dbus.service.Object):
                     points = self.act_settings.trigger_points[tid]
                     speed = 0
 
-                    if self.debug:
+                    if self.act_settings.debug:
                         print '    Sensor ' + str(tid) + ': ' + str(temp)
                     # check if temperature is above hysteresis shutdown point
                     if tid in self.current_trip_temps:
@@ -238,15 +230,15 @@ class Control(dbus.service.Object):
                             speed = trigger_speed
 
                     new_speed = max(new_speed, speed)
-            if self.debug:
+            if self.act_settings.debug:
                 print 'Trying to set fan level to ' + str(new_speed) + ':'
             # set fan speed
             self.set_speed(new_speed)
-            self.repoll(self.poll_time)
+            self.repoll(self.act_settings.poll_time)
         else:
             # fan control disabled
             self.set_speed(255)
-            self.repoll(self.poll_time)
+            self.repoll(self.act_settings.poll_time)
 
         # remove current timer
         return False

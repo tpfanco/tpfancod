@@ -19,14 +19,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import argparse
 import os.path
 import signal
 import sys
-import argparse
+
 import dbus.mainloop.glib
 import gobject
 
-from tpfand import build, settings, control
+from tpfand import settings, control
 if not ('/usr/share/pyshared' in sys.path):
     sys.path.append('/usr/share/pyshared')
 if not ('/usr/lib/python2.7/site-packages' in sys.path):
@@ -38,8 +39,36 @@ class Tpfand(object):
     """main tpfand process"""
 
     debug = False
+
     quiet = False
-    noibmthermal = False
+
+    no_ibm_thermal = False
+
+    # version
+    version = '1.0.0'
+
+    # path to config file
+    config_path = '/etc/tpfand.conf'
+
+    # path to the fan control interface
+    ibm_fan = '/proc/acpi/ibm/fan'
+
+    # path to the thermal sensors interface
+    ibm_thermal = '/proc/acpi/ibm/thermal'
+
+    # path to the directory that contains profiles
+    data_dir = '/usr/share/tpfand/'
+
+    # path to pid file
+    pid_path = '/var/run/tpfand.pid'
+
+    # poll time
+    poll_time = 3500
+
+    # kernel watchdog time
+    # the thinkpad_acpi watchdog accepts intervals between 1 and 120 seconds
+    # for safety reasons one shouldn't use values higher than 5 seconds
+    watchdog_time = 5
 
     def __init__(self):
         self.parse_command_line_args()
@@ -56,17 +85,31 @@ class Tpfand(object):
                             action='store_true')
         parser.add_argument('-q', '--quiet', help='minimize console output',
                             action='store_true')
+        parser.add_argument(
+            '-c', '--config', help='alternate location for the configuration file')
+        parser.add_argument(
+            '-P', '--pid', help='alternate location for the PID file of the running process')
+        parser.add_argument(
+            '-p', '--profiles', help='alternate location for the directory containing fan control profiles')
+
         args = parser.parse_args()
 
         self.debug = args.debug
         self.quiet = args.quiet
-        self.noibmthermal = args.noibmthermal
+        self.no_ibm_thermal = args.noibmthermal
+
+        if args.config:
+            self.config_path = args.config
+        if args.pid:
+            self.pid_path = args.pid
+        if args.profiles:
+            self.data_dir = args.profiles
 
     def start_fan_control(self):
         """daemon start function"""
 
         if not self.quiet:
-            print 'tpfand ' + build.version + ' - Copyright (C) 2011-2012 Vladyslav Shtabovenko'
+            print 'tpfand ' + self.version + ' - Copyright (C) 2011-2012 Vladyslav Shtabovenko'
             print 'Copyright (C) 2007-2008 Sebastian Urban'
             print 'This program comes with ABSOLUTELY NO WARRANTY'
             print
@@ -86,8 +129,8 @@ class Tpfand(object):
             print '             that doesn\'t have this file are currently unsupported'
             exit(1)
 
-        if os.path.isfile(build.pid_path):
-            print 'Fatal error: already running or ' + build.pid_path + ' left behind'
+        if os.path.isfile(self.pid_path):
+            print 'Fatal error: already running or ' + self.pid_path + ' left behind'
             exit(1)
 
         # go into daemon mode
@@ -97,16 +140,16 @@ class Tpfand(object):
         """returns True iff fan speed setting, watchdog and thermal reading is supported by kernel and
            we have write permissions"""
         try:
-            fanfile = open(build.ibm_fan, 'w')
+            fanfile = open(self.ibm_fan, 'w')
             fanfile.write('level auto')
             fanfile.flush()
             fanfile.close()
-            fanfile = open(build.ibm_fan, 'w')
+            fanfile = open(self.ibm_fan, 'w')
             fanfile.write('watchdog 5')
             fanfile.flush()
             fanfile.close()
 
-            tempfile = open(build.ibm_thermal, 'r')
+            tempfile = open(self.ibm_thermal, 'r')
             tempfile.readline()
             tempfile.close()
             return True
@@ -148,11 +191,11 @@ class Tpfand(object):
 
             # write pid file
             try:
-                pidfile = open(build.pid_path, 'w')
+                pidfile = open(self.pid_path, 'w')
                 pidfile.write(str(os.getpid()) + '\n')
                 pidfile.close()
             except IOError:
-                print >>sys.stderr, 'could not write pid-file: ', build.pid_path
+                print >>sys.stderr, 'could not write pid-file: ', self.pid_path
                 sys.exit(1)
 
         # start the daemon main loop
@@ -170,11 +213,12 @@ class Tpfand(object):
         #name = dbus.service.BusName('org.thinkpad.fancontrol.tpfand', system_bus)
 
         # create and load configuration
-        act_settings = settings.Settings(system_bus, '/Settings')
+        act_settings = settings.Settings(
+            system_bus, '/Settings', self.debug, self.quiet, self.no_ibm_thermal, self.version, self.config_path, self.ibm_fan, self.ibm_thermal, self.data_dir, self.poll_time, self.watchdog_time)
 
         # create controller
         controller = control.Control(
-            system_bus, '/Control', act_settings, self.debug)
+            system_bus, '/Control', act_settings)
 
         # start glib main loop
         mainloop = gobject.MainLoop()
@@ -184,7 +228,7 @@ class Tpfand(object):
         """handles SIGTERM"""
         controller.set_speed(255)
         try:
-            os.remove(build.pid_path)
+            os.remove(self.pid_path)
         except:
             pass
         mainloop.quit()

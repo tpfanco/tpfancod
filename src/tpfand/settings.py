@@ -23,7 +23,6 @@ import os.path
 import sys
 import dbus.service
 import dmidecode
-import build
 
 
 class ProfileNotOverriddenException(dbus.DBusException):
@@ -56,7 +55,20 @@ class Settings(dbus.service.Object):
     # comments for the last loaded profile
     profile_comment = ''
 
-    def __init__(self, bus, path):
+    def __init__(self, bus, path, debug, quiet, no_ibm_thermal, version, config_path, ibm_fan, ibm_thermal, data_dir, poll_time, watchdog_time):
+        self.debug = debug
+        self.quiet = quiet
+        self.no_ibm_thermal = no_ibm_thermal
+        self.version = version
+        self.config_path = config_path
+
+        self.ibm_fan = ibm_fan
+        self.ibm_thermal = ibm_thermal
+        self.data_dir = data_dir
+
+        self.poll_time = poll_time
+        self.watchdog_time = watchdog_time
+
         dbus.service.Object.__init__(self, bus, path)
         self.read_model_info()
         self.load()
@@ -93,8 +105,8 @@ class Settings(dbus.service.Object):
         """loads profile and config form disk"""
         self.enabled = False
         self.override_profile = False
-        if os.path.isfile(build.config_path):
-            self.read_config(build.config_path, True)
+        if os.path.isfile(self.config_path):
+            self.read_config(self.config_path, True)
         self.load_profile()
         self.verify()
 
@@ -119,11 +131,11 @@ class Settings(dbus.service.Object):
     @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='')
     def save(self):
         """saves config to disk"""
-        self.write_config(build.config_path)
+        self.write_config(self.config_path)
 
     def get_profile_file_list(self):
         """returns a list of profile files to load for this system"""
-        model_dir = build.data_dir + 'models/'
+        model_dir = self.data_dir + 'models/'
         product_id_dir = model_dir + 'by-id/'
         product_name_dir = model_dir + 'by-name/'
 

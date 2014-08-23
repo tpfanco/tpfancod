@@ -11,9 +11,7 @@ clean:
 	rm -f tpfand.8
 	rm -f src/tpfand/*.pyc
 
-sysvinit:
-	install -d $(DESTDIR)/usr/share/pyshared/tpfand
-	install -m 644 src/tpfand/* $(DESTDIR)/usr/share/pyshared/tpfand
+sysvinit:	
 	install -d $(DESTDIR)/etc/init.d
 	install -m 755 etc/init.d/tpfand $(DESTDIR)/etc/init.d/
 	install -d $(DESTDIR)/etc/acpi/suspend.d
@@ -23,9 +21,7 @@ sysvinit:
 	echo Installation complete.
 	echo You still need to create links to the init script.
 
-systemd:
-	install -d $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand
-	install -m 644 src/tpfand/* $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand
+systemd:		
 	install -d $(DESTDIR)/etc/systemd/system
 	install -m 755 etc/systemd/system/tpfand.service $(DESTDIR)/etc/systemd/system/
 	install -d $(DESTDIR)/usr/lib/systemd/system-sleep
@@ -34,11 +30,9 @@ systemd:
 	echo You still need to run "sudo systemctl enable tpfand" to enable tpfand service
 
 standard:
-	install -d $(DESTDIR)/usr/share/tpfand/
-	install -d $(DESTDIR)/usr/share/tpfand/models
-	install -d $(DESTDIR)/usr/share/tpfand/models/by-id
-	install -d $(DESTDIR)/usr/share/tpfand/models/by-name
-	install -m 644 share/models/generic $(DESTDIR)/usr/share/tpfand/models
+	install -d $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand
+	install -m 644 src/tpfand/* $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand
+	install -d $(DESTDIR)/etc/tpfancod/			
 	install -d $(DESTDIR)/etc/dbus-1/system.d/
 #	install -m 644 etc/dbus-1/system.d/org.tpfanco.tpfand.conf $(DESTDIR)/etc/dbus-1/system.d/org.tpfanco.tpfand.conf
 	install -m 644 etc/dbus-1/system.d/tpfand.conf $(DESTDIR)/etc/dbus-1/system.d/tpfand.conf
@@ -54,12 +48,10 @@ install-sysvinit: all standard sysvinit
 
 install-systemd: all standard systemd
 
-uninstall:
-	rm -rf $(DESTDIR)/usr/share/pyshared/tpfand
-	rm -rf $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand
-	rm -rf $(DESTDIR)/usr/share/tpfand/
+uninstall:	
+	rm -rf $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand	
 	rm -f $(DESTDIR)/usr/sbin/tpfand
-	rm -f $(DESTDIR)/etc/init.d/tpfand
+	rm -f $(DESTDIR)/etc/init.d/tpfand	
 	rm -f $(DESTDIR)/etc/systemd/system/tpfand.service
 	rm -f $(DESTDIR)/usr/lib/systemd/system-sleep/tpfand-notify.sh
 #	rm -f $(DESTDIR)/etc/dbus-1/system.d/org.tpfanco.tpfand.conf

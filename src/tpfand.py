@@ -19,11 +19,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import argparse
 import os.path
 import signal
 import sys
 
+import argparse
 import dbus.mainloop.glib
 import gobject
 
@@ -48,7 +48,9 @@ class Tpfand(object):
     version = '1.0.0'
 
     # path to config file
-    config_path = '/etc/tpfand.conf'
+    config_path = '/etc/tpfancod/settings.conf'
+
+    current_profile = 'profile_standard'
 
     # path to the fan control interface
     ibm_fan = '/proc/acpi/ibm/fan'
@@ -57,7 +59,7 @@ class Tpfand(object):
     ibm_thermal = '/proc/acpi/ibm/thermal'
 
     # path to the directory that contains profiles
-    data_dir = '/usr/share/tpfand/'
+    supplied_profile_dir = '/usr/share/tpfacod-profiles/'
 
     # path to pid file
     pid_path = '/var/run/tpfand.pid'
@@ -214,7 +216,7 @@ class Tpfand(object):
 
         # create and load configuration
         act_settings = settings.Settings(
-            system_bus, '/Settings', self.debug, self.quiet, self.no_ibm_thermal, self.version, self.config_path, self.ibm_fan, self.ibm_thermal, self.data_dir, self.poll_time, self.watchdog_time)
+            system_bus, '/Settings', self.debug, self.quiet, self.no_ibm_thermal, self.version, self.config_path, self.current_profile, self.ibm_fan, self.ibm_thermal, self.supplied_profile_dir, self.poll_time, self.watchdog_time)
 
         # create controller
         controller = control.Control(

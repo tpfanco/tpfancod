@@ -1,11 +1,11 @@
-Tpfanco daemon (tpfand)
+Tpfanco daemon (tpfancod)
 ====================================
 
-tpfand controls the system fan of ThinkPad notebooks based on specified 
+tpfancod controls the system fan of ThinkPad notebooks based on specified 
 temperature profiles. Seperate trigger points can be configured for every
 temperature sensor in the notebook.
 
-tpfand is written entirely in Python and licensed under the GNU GPL version 3.
+tpfancod is written entirely in Python and licensed under the GNU GPL version 3.
 
 REQUIREMENTS
 ============

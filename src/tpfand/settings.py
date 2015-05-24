@@ -2,7 +2,7 @@
 # -*- coding: utf8 -*-
 #
 # tpfanco - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks
-# Copyright (C) 2011-2014 Vladyslav Shtabovenko
+# Copyright (C) 2011-2015 Vladyslav Shtabovenko
 # Copyright (C) 2007-2009 Sebastian Urban
 #
 # This program is free software: you can redistribute it and/or modify
@@ -149,7 +149,7 @@ class Settings(dbus.service.Object):
     def get_profile_file_list(self):
         """returns a list of profile files to load for this system"""
 
-        file = ''
+        profile_file = ''
         profile = ''
 
         # match parts of product name
@@ -164,7 +164,7 @@ class Settings(dbus.service.Object):
         id_match = False
         model_path = self.supplied_profile_dir + self.product_id
         if os.path.isfile(model_path):
-            file = model_path
+            profile_file = model_path
             profile = model_path[len(model_dir):]
             id_match = True
 

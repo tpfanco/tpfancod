@@ -2,7 +2,7 @@
 # -*- coding: utf8 -*-
 #
 # tpfanco - controls the fan-speed of IBM/Lenovo ThinkPad Notebooks
-# Copyright (C) 2011-2014 Vladyslav Shtabovenko
+# Copyright (C) 2011-2015 Vladyslav Shtabovenko
 # Copyright (C) 2007-2009 Sebastian Urban
 #
 # This program is free software: you can redistribute it and/or modify
@@ -19,14 +19,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import argparse
 import os.path
 import signal
 import sys
 
-import argparse
 import dbus.mainloop.glib
 import gobject
-
 from tpfand import settings, control
 if not ('/usr/share/pyshared' in sys.path):
     sys.path.append('/usr/share/pyshared')
@@ -37,6 +36,10 @@ if not ('/usr/lib/python2.7/site-packages' in sys.path):
 class Tpfand(object):
 
     """main tpfand process"""
+
+    controller = None
+
+    mainloop = None
 
     debug = False
 
@@ -111,7 +114,7 @@ class Tpfand(object):
         """daemon start function"""
 
         if not self.quiet:
-            print 'tpfand ' + self.version + ' - Copyright (C) 2011-2012 Vladyslav Shtabovenko'
+            print 'tpfand ' + self.version + ' - Copyright (C) 2011-2015 Vladyslav Shtabovenko'
             print 'Copyright (C) 2007-2008 Sebastian Urban'
             print 'This program comes with ABSOLUTELY NO WARRANTY'
             print
@@ -219,21 +222,21 @@ class Tpfand(object):
             system_bus, '/Settings', self.debug, self.quiet, self.no_ibm_thermal, self.version, self.config_path, self.current_profile, self.ibm_fan, self.ibm_thermal, self.supplied_profile_dir, self.poll_time, self.watchdog_time)
 
         # create controller
-        controller = control.Control(
+        self.controller = control.Control(
             system_bus, '/Control', act_settings)
 
         # start glib main loop
-        mainloop = gobject.MainLoop()
-        mainloop.run()
+        self.mainloop = gobject.MainLoop()
+        self.mainloop.run()
 
     def term_handler(self, signum, frame):
         """handles SIGTERM"""
-        controller.set_speed(255)
+        self.controller.set_speed(255)
         try:
             os.remove(self.pid_path)
         except:
             pass
-        mainloop.quit()
+        self.mainloop.quit()
 
 
 def main():

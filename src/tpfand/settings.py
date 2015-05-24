@@ -26,8 +26,6 @@ import os.path
 import sys
 
 import dbus.service
-import dmidecode
-
 
 class ProfileNotOverriddenException(dbus.DBusException):
     _dbus_error_name = 'org.thinkpad.fancontrol.ProfileNotOverriddenException'
@@ -171,12 +169,14 @@ class Settings(dbus.service.Object):
         return file, profile, id_match
 
     def read_model_info(self):
-        """reads model info using dmidecode module"""
+        """reads model info from /sys/class/dmi/id"""
         try:
-            current_system = dmidecode.system()
-            hw_product = current_system['0x0001']['data']['Product Name']
-            hw_vendor = current_system['0x0001']['data']['Manufacturer']
-            hw_version = current_system['0x0001']['data']['Version']
+            with open("/sys/class/dmi/id/product_name", 'r') as f:
+                hw_product = f.read(256)
+            with open("/sys/class/dmi/id/board_vendor", 'r') as f:
+                hw_vendor = f.read(256)
+            with open("/sys/class/dmi/id/product_version", 'r') as f:
+                hw_version = f.read(256)
             product_id = hw_vendor + '_' + hw_product
             self.product_id = product_id.lower()
             product_name = hw_vendor.lower() + '_' + hw_version.lower()
@@ -187,7 +187,7 @@ class Settings(dbus.service.Object):
             self.product_pretty_name = hw_version
             self.product_pretty_id = hw_product
         except:
-            print 'Warning: unable to get your system model from dmidecode'
+            print 'Warning: unable to get information about your system!'
             self.product_id = ''
             self.product_name = ''
             self.product_pretty_vendor = ''

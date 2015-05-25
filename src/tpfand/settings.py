@@ -166,7 +166,7 @@ class Settings(dbus.service.Object):
             profile = model_path[len(model_dir):]
             id_match = True
 
-        return file, profile, id_match
+        return profile_file, profile, id_match
 
     def read_model_info(self):
         """reads model info from /sys/class/dmi/id"""
@@ -393,6 +393,7 @@ class Settings(dbus.service.Object):
                         if len(trigger_dict) > 0:
                             trigger_points[tid] = trigger_dict
                         sensor_names[tid] = tid_conf['name']
+                    # TODO Parsing for hwmon sensors
 
                 settings_from_profile['trigger_points'] = trigger_points
                 settings_from_profile['sensor_names'] = sensor_names

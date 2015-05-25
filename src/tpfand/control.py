@@ -46,6 +46,12 @@ class Control(dbus.service.Object):
 
     def __init__(self, bus, path, act_settings):
         self.act_settings = act_settings
+        if self.act_settings.debug:
+            print 'Profile comment: ' + str(self.act_settings.profile_comment)
+            print 'Hysteresis: ' + str(self.act_settings.hysteresis)
+            print 'Trigger points: ' + str(self.act_settings.trigger_points)
+            print 'Sensor names: ' + str(self.act_settings.sensor_names)
+
         dbus.service.Object.__init__(self, bus, path)
         self.repoll(1)
 

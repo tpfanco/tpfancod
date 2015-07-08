@@ -27,6 +27,7 @@ import sys
 
 import dbus.service
 
+
 class ProfileNotOverriddenException(dbus.DBusException):
     _dbus_error_name = 'org.thinkpad.fancontrol.ProfileNotOverriddenException'
 
@@ -163,7 +164,7 @@ class Settings(dbus.service.Object):
         model_path = self.supplied_profile_dir + self.product_id
         if os.path.isfile(model_path):
             profile_file = model_path
-            profile = model_path[len(model_dir):]
+            profile = model_path[len(model_path):]
             id_match = True
 
         return profile_file, profile, id_match
@@ -224,17 +225,18 @@ class Settings(dbus.service.Object):
         return os.path.split(
             self.config_path)[0] + '/' + profile
 
-    # TODO: needs to be improved
     def verify(self):
         """Verifies that all settings are valid"""
-        for n in range(0, self.get_sensor_count()):
-            if n not in self.sensor_names or len(self.sensor_names[n].strip()) == 0:
-                self.sensor_names[n] = 'Sensor ' + str(n)
-            else:
-                self.sensor_names[n] = self.sensor_names[
-                    n].replace('=', '-').replace('\n', '')
-            if n not in self.trigger_points:
-                self.trigger_points[n] = {0: 255}
+        # TODO: needs to be improved
+        # for n in self.trigger_points:
+        # if n not in self.sensor_names or len(self.sensor_names[n].strip()) == 0:
+        #   self.sensor_names[n] = 'Sensor ' + str(n)
+        # else:
+        #     self.sensor_names[n] = self.sensor_names[
+        #          n].replace('=', '-').replace('\n', '')
+        # if n not in self.trigger_points:
+        #    self.trigger_points[n] = {0: 255}
+
         for opt in ['hysteresis']:
             val = eval('self.' + opt)
             lmin, lmax = self.get_setting_limits(opt)
@@ -382,8 +384,10 @@ class Settings(dbus.service.Object):
             if current_profile.has_section('Sensors'):
                 trigger_points = {}
                 sensor_names = {}
-
+                sensor_scalings = {}
                 for sensor in current_profile.options('Sensors'):
+                    if self.debug:
+                        print "Parsing sensor " + sensor
 
                     if 'ibm_thermal_sensor' in sensor:
                         tid = int(sensor.split('_')[3])
@@ -393,10 +397,23 @@ class Settings(dbus.service.Object):
                         if len(trigger_dict) > 0:
                             trigger_points[tid] = trigger_dict
                         sensor_names[tid] = tid_conf['name']
-                    # TODO Parsing for hwmon sensors
+
+                    if '/' in sensor:
+                        if not os.path.isfile(sensor):
+                            print 'sensor %s doesn\'t exist' % sensor
+                            raise IOError
+                        tid = sensor
+                        tid_conf = ast.literal_eval(
+                            current_profile.get('Sensors', sensor))
+                        trigger_dict = tid_conf['triggers']
+                        if len(trigger_dict) > 0:
+                            trigger_points[tid] = trigger_dict
+                        sensor_names[tid] = tid_conf['name']
+                        sensor_scalings[tid] = tid_conf['scaling']
 
                 settings_from_profile['trigger_points'] = trigger_points
                 settings_from_profile['sensor_names'] = sensor_names
+                settings_from_profile['sensor_scalings'] = sensor_scalings
 
         except Exception, e:
             print 'Error parsing profile file: %s' % path
@@ -534,6 +551,7 @@ class Settings(dbus.service.Object):
             self.hysteresis = settings_from_profile['hysteresis']
             self.trigger_points = settings_from_profile['trigger_points']
             self.sensor_names = settings_from_profile['sensor_names']
+            self.sensor_scalings = settings_from_profile['sensor_scalings']
         else:
             print 'Error loading values from ' + settings_from_profile['file_path']
             return False

@@ -19,8 +19,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os.path
 import sys
 import time
+
 import dbus.service
 import gobject
 
@@ -101,11 +103,13 @@ class Control(dbus.service.Object):
     @dbus.service.method('org.thinkpad.fancontrol.Control', in_signature='', out_signature='ai')
     def get_temperatures(self):
         """returns list of current sensor readings, +/-128 or 0 means sensor is disconnected"""
+        res = None
+        res2 = {}
         try:
             tempfile = open(self.act_settings.ibm_thermal, 'r')
             elements = tempfile.readline().split()[1:]
             tempfile.close()
-            return map(int, elements)
+            res = map(int, elements)
         except IOError, e:
             # sometimes read fails during suspend/resume
             raise UnavailableException(e.message)
@@ -114,6 +118,29 @@ class Control(dbus.service.Object):
                 tempfile.close()
             except:
                 pass
+        # now we need to loop through hwmon sensors
+        for sensor in self.act_settings.trigger_points:
+            # string are assumed to be from hwmon, while ints are from
+            # ibm_thermal
+            if type(sensor) is str:
+                try:
+                    tempfile = open(sensor, 'r')
+                    element = tempfile.readline()
+                    tempfile.close()
+                    scaling = self.act_settings.sensor_scalings[sensor]
+                    # need to convert the value of the sensor to degree
+                    # Celsius
+                    res2[sensor] = int(
+                        round(float(element.strip()) * float(scaling)))
+                except IOError, e:
+                    # sometimes read fails during suspend/resume
+                    raise UnavailableException(e.message)
+                finally:
+                    try:
+                        tempfile.close()
+                    except:
+                        pass
+        return res, res2
 
     @dbus.service.method('org.thinkpad.fancontrol.Control', in_signature='', out_signature='a{si}')
     def get_fan_state(self):
@@ -200,7 +227,7 @@ class Control(dbus.service.Object):
 
             # read thermal data
             try:
-                temps = self.get_temperatures()
+                temps, temps_hwmon = self.get_temperatures()
             except UnavailableException:
                 # temperature read failed
                 self.set_speed(255)
@@ -209,33 +236,66 @@ class Control(dbus.service.Object):
 
             new_speed = 0
             if self.act_settings.debug:
-                print 'Current sensor values:'
+                print 'Current ibm_thermal sensor values:'
             for tid in range(0, len(temps)):
-                temp = temps[tid]
-                # value is +/-128 or 0, if sensor is disconnected
-                if abs(temp) != 128 and abs(temp) != 0:
-                    points = self.act_settings.trigger_points[tid]
-                    speed = 0
+                # we look only at the sensors that are listed in the profile
+                if tid in self.act_settings.trigger_points:
+                    temp = temps[tid]
+                    # value is +/-128 or 0, if sensor is disconnected
+                    if abs(temp) != 128 and abs(temp) != 0:
+                        points = self.act_settings.trigger_points[tid]
+                        speed = 0
 
-                    if self.act_settings.debug:
-                        print '    Sensor ' + str(tid) + ': ' + str(temp)
-                    # check if temperature is above hysteresis shutdown point
-                    if tid in self.current_trip_temps:
-                        if temp >= self.current_trip_temps[tid]:
-                            speed = self.current_trip_speeds[tid]
-                        else:
-                            del self.current_trip_temps[tid]
-                            del self.current_trip_speeds[tid]
+                        if self.act_settings.debug:
+                            print '    Sensor ' + str(tid) + ': ' + str(temp)
+                        # check if temperature is above hysteresis shutdown
+                        # point
+                        if tid in self.current_trip_temps:
+                            if temp >= self.current_trip_temps[tid]:
+                                speed = self.current_trip_speeds[tid]
+                            else:
+                                del self.current_trip_temps[tid]
+                                del self.current_trip_speeds[tid]
 
-                    # check if temperature is over trigger point
-                    for trigger_temp, trigger_speed in points.iteritems():
-                        if temp >= trigger_temp and speed < trigger_speed:
-                            self.current_trip_temps[
-                                tid] = trigger_temp - self.act_settings.hysteresis
-                            self.current_trip_speeds[tid] = trigger_speed
-                            speed = trigger_speed
+                        # check if temperature is over trigger point
+                        for trigger_temp, trigger_speed in points.iteritems():
+                            if temp >= trigger_temp and speed < trigger_speed:
+                                self.current_trip_temps[
+                                    tid] = trigger_temp - self.act_settings.hysteresis
+                                self.current_trip_speeds[tid] = trigger_speed
+                                speed = trigger_speed
 
-                    new_speed = max(new_speed, speed)
+                        new_speed = max(new_speed, speed)
+            if self.act_settings.debug:
+                print 'Current hwmon sensor values:'
+
+            # we look only at the sensors that are listed in the profile
+            for sensor in temps_hwmon:
+                temp = temps_hwmon[sensor]
+                # value is 0, if sensor is disconnected
+
+                points = self.act_settings.trigger_points[sensor]
+                speed = 0
+
+                if self.act_settings.debug:
+                    print '    Sensor ' + str(sensor) + ': ' + str(temp)
+                # check if temperature is above hysteresis shutdown point
+                if sensor in self.current_trip_temps:
+                    if temp >= self.current_trip_temps[sensor]:
+                        speed = self.current_trip_speeds[sensor]
+                    else:
+                        del self.current_trip_temps[sensor]
+                        del self.current_trip_speeds[sensor]
+
+                # check if temperature is over trigger point
+                for trigger_temp, trigger_speed in points.iteritems():
+                    if temp >= trigger_temp and speed < trigger_speed:
+                        self.current_trip_temps[
+                            sensor] = trigger_temp - self.act_settings.hysteresis
+                        self.current_trip_speeds[sensor] = trigger_speed
+                        speed = trigger_speed
+
+                new_speed = max(new_speed, speed)
             if self.act_settings.debug:
                 print 'Trying to set fan level to ' + str(new_speed) + ':'
             # set fan speed

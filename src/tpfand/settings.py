@@ -18,11 +18,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-
 import ConfigParser
 import StringIO
 import ast
+import logging
 import os.path
+
 import dbus.service
 
 
@@ -62,7 +63,7 @@ class Settings(dbus.service.Object):
     profile_comment = ''
 
     def __init__(self, bus, path, debug, quiet, no_ibm_thermal, version, config_path, current_profile, ibm_fan, ibm_thermal, supplied_profile_dir, poll_time, watchdog_time):
-
+        self.logger = logging.getLogger(__name__)
         self.debug = debug
         self.quiet = quiet
         self.no_ibm_thermal = no_ibm_thermal
@@ -77,9 +78,14 @@ class Settings(dbus.service.Object):
 
         self.profile_path = os.path.split(
             config_path)[0] + '/' + self.current_profile
-        print 'here1'
+
         dbus.service.Object.__init__(self, bus, path)
-        print 'here2'
+
+        if self.debug:
+            self.logger.setLevel(logging.DEBUG)
+        else:
+            self.logger.setLevel(logging.ERROR)
+
         self.read_model_info()
         self.load()
 
@@ -191,7 +197,8 @@ class Settings(dbus.service.Object):
             self.product_pretty_name = hw_version
             self.product_pretty_id = hw_product
         except:
-            print 'Warning: unable to get information about your system!'
+            self.logger.error(
+                'Warning: unable to get information about your system!')
             self.product_id = ''
             self.product_name = ''
             self.product_pretty_vendor = ''
@@ -262,8 +269,6 @@ class Settings(dbus.service.Object):
 
     def check_setting(self, setting_name, setting_value):
         """Verifies that the value of the given setting is allowed"""
-        print 'starting'
-        print setting_name, setting_value
         # some settings are boolean, so we just need to check their type
         if setting_name in ['enabled', 'override_profile']:
             if not isinstance(setting_value, bool):
@@ -356,16 +361,14 @@ class Settings(dbus.service.Object):
         res = ''
         string_buffer = StringIO.StringIO(res)
         self.write_profile(string_buffer, is_a_string_buffer=True)
-        print self.profile_as_string
         return self.profile_as_string
 
     def read_config(self, path):
         """Reads a configuration file"""
 
         settings_from_config = {}
+        self.logger.debug('Parsing the configuration file located at ' + path)
 
-        if self.debug:
-            print "Parsing the configuration file located at " + path
         try:
             settings_from_config['file_path'] = path
             current_config = ConfigParser.SafeConfigParser()
@@ -397,9 +400,7 @@ class Settings(dbus.service.Object):
         """Reads a fan profile file"""
 
         settings_from_profile = {}
-
-        if self.debug:
-            print "Parsing the profile file located at " + path
+        self.logger.debug('Parsing the profile file located at ' + path)
 
         try:
             settings_from_profile['file_path'] = path
@@ -439,8 +440,8 @@ class Settings(dbus.service.Object):
                 sensor_names = {}
                 sensor_scalings = {}
                 for sensor in current_profile.options('Sensors'):
-                    if self.debug:
-                        print "Parsing sensor " + sensor
+
+                    self.logger.debug('Parsing sensor ' + sensor)
                     if not sensor.startswith('ibm_thermal_sensor') and not sensor.startswith('/'):
                         continue
                     tid_conf = ast.literal_eval(
@@ -472,8 +473,7 @@ class Settings(dbus.service.Object):
     def write_config(self, path):
         """saves current configuration to the specified configuration file """
 
-        if self.debug:
-            print "Saving current configuration to " + path
+        self.logger.debug('Saving current configuration to ' + path)
 
         try:
             current_config = ConfigParser.SafeConfigParser(allow_no_value=True)
@@ -502,7 +502,7 @@ class Settings(dbus.service.Object):
                 'General', 'current_profile', self.current_profile)
 
         except Exception, e:
-            print 'Error reading curent configuration'
+            print 'Error reading current configuration'
             print e
             return False
 
@@ -523,11 +523,10 @@ class Settings(dbus.service.Object):
     def write_profile(self, path, is_a_string_buffer=False):
         """writes a fan profile file"""
 
-        if self.debug:
-            if is_a_string_buffer:
-                print "Saving current profile to a string"
-            else:
-                print "Saving current profile to " + path
+        if is_a_string_buffer:
+            self.logger.debug('Saving current profile to a string')
+        else:
+            self.logger.debug('Saving current profile to ' + path)
 
         try:
             current_profile = ConfigParser.SafeConfigParser(

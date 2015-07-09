@@ -20,6 +20,7 @@
 #
 
 import argparse
+import logging
 import os.path
 import signal
 import sys
@@ -76,6 +77,10 @@ class Tpfand(object):
     watchdog_time = 5
 
     def __init__(self):
+        logging.basicConfig(stream=sys.stdout,
+                            format='%(asctime)s - %(levelname)s - %(message)s',
+                            datefmt='%Y-%m-%d %H:%M:%S')
+        self.logger = logging.getLogger(__name__)
         self.parse_command_line_args()
         self.start_fan_control()
 
@@ -123,7 +128,11 @@ class Tpfand(object):
             print
 
         if self.debug:
-            print 'Running in debug mode'
+            self.logger.setLevel(logging.DEBUG)
+        else:
+            self.logger.setLevel(logging.ERROR)
+
+        self.logger.debug('Running in debug mode')
 
         if not self.is_system_suitable():
             print 'Fatal error: unable to set fanspeed, enable watchdog or read temperature'

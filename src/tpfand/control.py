@@ -19,10 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path
-import sys
-import time
-
+import logging
 import dbus.service
 import gobject
 
@@ -48,11 +45,21 @@ class Control(dbus.service.Object):
 
     def __init__(self, bus, path, act_settings):
         self.act_settings = act_settings
+        self.logger = logging.getLogger(__name__)
+
         if self.act_settings.debug:
-            print 'Profile comment: ' + str(self.act_settings.profile_comment)
-            print 'Hysteresis: ' + str(self.act_settings.hysteresis)
-            print 'Trigger points: ' + str(self.act_settings.trigger_points)
-            print 'Sensor names: ' + str(self.act_settings.sensor_names)
+            self.logger.setLevel(logging.DEBUG)
+        else:
+            self.logger.setLevel(logging.ERROR)
+
+        self.logger.debug(
+            'Profile comment: ' + str(self.act_settings.profile_comment))
+        self.logger.debug(
+            'Hysteresis: ' + str(self.act_settings.hysteresis))
+        self.logger.debug(
+            'Trigger points: ' + str(self.act_settings.trigger_points))
+        self.logger.debug(
+            'Sensor names: ' + str(self.act_settings.sensor_names))
 
         dbus.service.Object.__init__(self, bus, path)
         self.repoll(1)
@@ -61,18 +68,17 @@ class Control(dbus.service.Object):
         """sets the fan speed (0=off, 2-8=normal, 254=disengaged, 255=ec, 256=full-speed)"""
         fan_state = self.get_fan_state()
         try:
-            if self.act_settings.debug:
-                print '  Rearming fan watchdog timer (+' + str(self.act_settings.watchdog_time) + ' s)'
-                print '  Current fan level is ' + str(fan_state['level'])
+            self.logger.debug(
+                'Rearming fan watchdog timer (+' + str(self.act_settings.watchdog_time) + ' s)')
+            self.logger.debug(
+                'Current fan level is ' + str(fan_state['level']))
             fanfile = open(self.act_settings.ibm_fan, 'w')
             fanfile.write('watchdog %d' % self.act_settings.watchdog_time)
             fanfile.flush()
             if speed == fan_state['level']:
-                if self.act_settings.debug:
-                    print '  -> Keeping the current fan level unchanged'
+                self.logger.debug('-> Keeping the current fan level unchanged')
             else:
-                if self.act_settings.debug:
-                    print '  -> Setting fan level to ' + str(speed)
+                self.logger.debug('-> Setting fan level to ' + str(speed))
                 if speed == 0:
                     fanfile.write('disable')
                 else:
@@ -209,23 +215,12 @@ class Control(dbus.service.Object):
         """main fan control routine"""
         # get the current fan level
         fan_state = self.get_fan_state()
-
-        if self.act_settings.debug:
-            print
-            print str(time.strftime('%H:%M:%S')) + ': Polling the sensors'
-            print 'Current fan level: ' + str(fan_state['level']) + ' (' + str(fan_state['rpm']) + ' RPM)'
+        self.logger.debug('')
+        self.logger.debug('Polling the sensors')
+        self.logger.debug(
+            'Current fan level: ' + str(fan_state['level']) + ' (' + str(fan_state['rpm']) + ' RPM)')
 
         if self.act_settings.enabled:
-
-            # probing the disengaged mode
-            # if level not in (0,1,254,255,256):
-            #    if debug:
-            #      print 'Applying fan pulsing fix'
-            #    self.set_speed(254)
-            #    time.sleep(0.5)
-            #    self.set_speed(level)
-
-            # read thermal data
             try:
                 temps = self.get_temperatures()
             except UnavailableException:
@@ -235,9 +230,8 @@ class Control(dbus.service.Object):
                 return False
 
             new_speed = -1
-            if self.act_settings.debug:
-                print 'Current ibm_thermal sensor values:'
-            print temps
+            self.logger.debug('Current ibm_thermal sensor values:')
+            self.logger.debug(temps)
             for tid in temps:
                 # we look only at the sensors that are listed in the profile
                 if tid in self.act_settings.trigger_points and tid.isdigit():
@@ -246,9 +240,8 @@ class Control(dbus.service.Object):
                     if abs(temp) != 128 and abs(temp) != 0:
                         points = self.act_settings.trigger_points[tid]
                         speed = 0
-
-                        if self.act_settings.debug:
-                            print '    Sensor ' + str(tid) + ': ' + str(temp)
+                        self.logger.debug(
+                            'Sensor ' + str(tid) + ': ' + str(temp))
                         # check if temperature is above hysteresis shutdown
                         # point
                         if tid in self.current_trip_temps:
@@ -267,8 +260,7 @@ class Control(dbus.service.Object):
                                 speed = trigger_speed
 
                         new_speed = max(new_speed, speed)
-            if self.act_settings.debug:
-                print 'Current hwmon sensor values:'
+            self.logger.debug('Current hwmon sensor values:')
 
             # we look only at the sensors that are listed in the profile
             for sensor in temps:
@@ -278,9 +270,8 @@ class Control(dbus.service.Object):
 
                     points = self.act_settings.trigger_points[sensor]
                     speed = 0
-
-                    if self.act_settings.debug:
-                        print '    Sensor ' + str(sensor) + ': ' + str(temp)
+                    self.logger.debug(
+                        '    Sensor ' + str(sensor) + ': ' + str(temp))
                     # check if temperature is above hysteresis shutdown point
                     if sensor in self.current_trip_temps:
                         if temp >= self.current_trip_temps[sensor]:
@@ -298,8 +289,8 @@ class Control(dbus.service.Object):
                             speed = trigger_speed
 
                     new_speed = max(new_speed, speed)
-            if self.act_settings.debug:
-                print 'Trying to set fan level to ' + str(new_speed) + ':'
+            self.logger.debug(
+                'Trying to set fan level to ' + str(new_speed) + ':')
             # for the case that there are no active sensors we let the EC control
             # overtake
             if new_speed == -1:

@@ -11,7 +11,7 @@ clean:
 	rm -f tpfand.8
 	rm -f src/tpfand/*.pyc
 
-sysvinit:	
+sysvinit:
 	install -d $(DESTDIR)/etc/init.d
 	install -m 755 etc/init.d/tpfand $(DESTDIR)/etc/init.d/
 	install -d $(DESTDIR)/etc/acpi/suspend.d
@@ -21,7 +21,7 @@ sysvinit:
 	echo Installation complete.
 	echo You still need to create links to the init script.
 
-systemd:		
+systemd:
 	install -d $(DESTDIR)/etc/systemd/system
 	install -m 755 etc/systemd/system/tpfand.service $(DESTDIR)/etc/systemd/system/
 	install -d $(DESTDIR)/usr/lib/systemd/system-sleep
@@ -32,13 +32,12 @@ systemd:
 standard:
 	install -d $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand
 	install -m 644 src/tpfand/* $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand
-	install -d $(DESTDIR)/etc/tpfancod/			
+	install -d $(DESTDIR)/etc/tpfancod/
 	install -d $(DESTDIR)/etc/dbus-1/system.d/
-#	install -m 644 etc/dbus-1/system.d/org.tpfanco.tpfand.conf $(DESTDIR)/etc/dbus-1/system.d/org.tpfanco.tpfand.conf
-	install -m 644 etc/dbus-1/system.d/tpfand.conf $(DESTDIR)/etc/dbus-1/system.d/tpfand.conf
-#	install -d $(DESTDIR)/usr/share/polkit-1
-#	install -d $(DESTDIR)/usr/share/polkit-1/actions
-#	install -m 644 share/polkit-1/actions/org.tpfanco.settings.policy $(DESTDIR)/usr/share/polkit-1/actions/org.tpfanco.settings.policy
+	install -m 644 etc/dbus-1/system.d/tpfancod.conf $(DESTDIR)/etc/dbus-1/system.d/tpfancod.conf
+	install -d $(DESTDIR)/usr/share/polkit-1
+	install -d $(DESTDIR)/usr/share/polkit-1/actions
+	install -m 644 share/polkit-1/actions/org.tpfanco.tpfand.policy $(DESTDIR)/usr/share/polkit-1/actions/org.tpfanco.tpfand.policy
 	install -d $(DESTDIR)/usr/sbin
 	install -m 755 src/tpfand.py $(DESTDIR)/usr/sbin/tpfand
 	install -d $(DESTDIR)/etc/modprobe.d
@@ -48,15 +47,14 @@ install-sysvinit: all standard sysvinit
 
 install-systemd: all standard systemd
 
-uninstall:	
-	rm -rf $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand	
+uninstall:
+	rm -rf $(DESTDIR)/usr/lib/python2.7/site-packages/tpfand
 	rm -f $(DESTDIR)/usr/sbin/tpfand
-	rm -f $(DESTDIR)/etc/init.d/tpfand	
+	rm -f $(DESTDIR)/etc/init.d/tpfand
 	rm -f $(DESTDIR)/etc/systemd/system/tpfand.service
 	rm -f $(DESTDIR)/usr/lib/systemd/system-sleep/tpfand-notify.sh
-#	rm -f $(DESTDIR)/etc/dbus-1/system.d/org.tpfanco.tpfand.conf
-	rm -f $(DESTDIR)/etc/dbus-1/system.d/tpfand.conf
-#	rm -f $(DESTDIR)/usr/share/polkit-1/actions/org.tpfanco.settings.policy
+	rm -f $(DESTDIR)/etc/dbus-1/system.d/tpfancod.conf
+	rm -f $(DESTDIR)/usr/share/polkit-1/actions/org.tpfanco.tpfand.policy
 	rm -f $(DESTDIR)/etc/acpi/suspend.d/09-tpfand-stop.sh
 	rm -f $(DESTDIR)/etc/acpi/resume.d/91-tpfand-start.sh
 	rm -f $(DESTDIR)/etc/modprobe.d/tpfand.conf

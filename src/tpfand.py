@@ -215,15 +215,16 @@ class Tpfand(object):
         # register d-bus service
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         system_bus = dbus.SystemBus()
-        #name = dbus.service.BusName('org.thinkpad.fancontrol.tpfand', system_bus)
+        name = dbus.service.BusName(
+            'org.tpfanco.tpfancod', system_bus)
 
         # create and load configuration
         act_settings = settings.Settings(
-            system_bus, '/Settings', self.debug, self.quiet, self.no_ibm_thermal, self.version, self.config_path, self.current_profile, self.ibm_fan, self.ibm_thermal, self.supplied_profile_dir, self.poll_time, self.watchdog_time)
+            name, '/Settings', self.debug, self.quiet, self.no_ibm_thermal, self.version, self.config_path, self.current_profile, self.ibm_fan, self.ibm_thermal, self.supplied_profile_dir, self.poll_time, self.watchdog_time)
 
         # create controller
         self.controller = control.Control(
-            system_bus, '/Control', act_settings)
+            name, '/Control', act_settings)
 
         # start glib main loop
         self.mainloop = gobject.MainLoop()

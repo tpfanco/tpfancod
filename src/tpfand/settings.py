@@ -23,8 +23,6 @@ import ConfigParser
 import StringIO
 import ast
 import os.path
-import sys
-
 import dbus.service
 
 
@@ -34,11 +32,16 @@ class ProfileNotOverriddenException(dbus.DBusException):
 
 class Settings(dbus.service.Object):
 
+    max_temp = 100
+    option_limits = {'hysteresis': [0, 10]}
+    profile_path = ''
+
     """profile and config settings"""
     profile_as_string = ''
     # user options
     enabled = False
     override_profile = False
+    current_profile = ''
 
     # profile / user overrideable options
     sensor_names = {}
@@ -74,13 +77,13 @@ class Settings(dbus.service.Object):
 
         self.profile_path = os.path.split(
             config_path)[0] + '/' + self.current_profile
-
+        print 'here1'
         dbus.service.Object.__init__(self, bus, path)
-
+        print 'here2'
         self.read_model_info()
         self.load()
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='a{ss}')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{ss}')
     def get_model_info(self):
         """returns hardware model info"""
         return {'vendor': self.product_pretty_vendor,
@@ -89,12 +92,12 @@ class Settings(dbus.service.Object):
                 'profile_name': self.product_name,
                 'profile_id': self.product_id}
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='as')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='as')
     def get_loaded_profiles(self):
         """returns a list of the given profiles"""
         return self.loaded_profiles
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='s')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='s')
     def get_profile_comment(self):
         """returns the comment for the last loaded profile"""
         if self.override_profile:
@@ -102,12 +105,12 @@ class Settings(dbus.service.Object):
         else:
             return self.profile_comment
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='b')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='b')
     def is_profile_exactly_matched(self):
         """returns True if profile exactly matches hardware"""
         return self.id_match
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='')
     def load(self):
         """loads profile and config form disk"""
 
@@ -137,9 +140,9 @@ class Settings(dbus.service.Object):
                     self.load_profile(self.read_profile(
                         profile_from_db))
 
-        self.verify()
+        self.verify_tpfancod_settings()
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='')
     def save(self):
         """saves config to disk"""
         self.write_profile(self.profile_path)
@@ -195,79 +198,123 @@ class Settings(dbus.service.Object):
             self.product_pretty_name = ''
             self.product_pretty_id = ''
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='a{is}')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{is}')
     def get_sensor_names(self):
         """returns the sensor names"""
         return self.sensor_names
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='a{is}', out_signature='')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='a{ss}', out_signature='')
     def set_sensor_names(self, tset):
         """sets the sensor names"""
         self.verify_profile_overridden()
         self.sensor_names = tset
-        self.verify()
+        self.verify_tpfancod_settings()
         self.save()
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='a{ia{ii}}')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{ia{ii}}')
     def get_trigger_points(self):
         """returns the temperature trigger points for the sensors"""
         return self.trigger_points
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='a{ia{ii}}', out_signature='')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='a{ia{ii}}', out_signature='')
     def set_trigger_points(self, tset):
         """sets the temperature trigger points for the sensors"""
         self.verify_profile_overridden()
         self.trigger_points = tset
-        self.verify()
+        self.verify_tpfancod_settings()
         self.save()
 
     def get_profile_path(self, profile):
         return os.path.split(
             self.config_path)[0] + '/' + profile
 
-    def verify(self):
-        """Verifies that all settings are valid"""
-        # TODO: needs to be improved
-        # for n in self.trigger_points:
-        # if n not in self.sensor_names or len(self.sensor_names[n].strip()) == 0:
-        #   self.sensor_names[n] = 'Sensor ' + str(n)
-        # else:
-        #     self.sensor_names[n] = self.sensor_names[
-        #          n].replace('=', '-').replace('\n', '')
-        # if n not in self.trigger_points:
-        #    self.trigger_points[n] = {0: 255}
+    def check_sensors_and_triggers(self, trigger_points, sensor_names):
+        '''Verifies that given sensors, triggers and sensor names are valid'''
 
-        for opt in ['hysteresis']:
+        if sorted(trigger_points.keys()) != sorted(sensor_names.keys()):
+            raise SyntaxError(
+                'The number of sensors and sensor names do not match')
+        for sensor in trigger_points:
+            if not sensor.isdigit() and not os.path.isfile(sensor):
+                raise SyntaxError(
+                    'The sensor ' + sensor + 'doesn\'t exist')
+
+            if len(sensor_names[sensor].strip()) == 0:
+                raise SyntaxError(
+                    'The sensor ' + sensor + 'doesn\'t have a name')
+            if len(trigger_points[sensor]) == 0:
+                raise SyntaxError(
+                    'The sensor ' + sensor + 'doesn\'t triggers attached to it')
+            for temp in trigger_points[sensor]:
+                fan_level = trigger_points[sensor][temp]
+                if not isinstance(temp, (int, long)):
+                    raise SyntaxError(
+                        'The temperature ' + str(temp) + 'is not an integer')
+                if temp > self.max_temp or temp < 0:
+                    raise SyntaxError(
+                        'The temperature ' + str(temp) + 'is out of bounds')
+                if not isinstance(fan_level, (int, long)):
+                    raise SyntaxError(
+                        'The fan level ' + str(fan_level) + 'is not an integer')
+                if fan_level > 255 or fan_level < 0:
+                    raise SyntaxError(
+                        'The fan_level ' + str(fan_level) + 'is out of bounds')
+
+    def check_setting(self, setting_name, setting_value):
+        """Verifies that the value of the given setting is allowed"""
+        print 'starting'
+        print setting_name, setting_value
+        # some settings are boolean, so we just need to check their type
+        if setting_name in ['enabled', 'override_profile']:
+            if not isinstance(setting_value, bool):
+                raise SyntaxError(
+                    'The value of ' + str(setting_name) + ' is out of bounds')
+            else:
+                return
+        # other settings point to files, so we need to check if they exist
+        if setting_name in ['current_profile']:
+            if not os.path.isfile(os.path.split(self.config_path)[0] + '/' + setting_value):
+                raise SyntaxError(
+                    'The profile ' + str(setting_value) + ' doesn\'t exist')
+            else:
+                return
+
+        lmin, lmax = self.get_setting_limits(setting_name)
+        if setting_value < lmin or setting_value > lmax:
+            raise SyntaxError(
+                'The value of ' + str(setting_name) + 'is out of bounds')
+
+    def verify_tpfancod_settings(self):
+        """Verifies that all settings of tpfancod are valid"""
+
+        # check sensors, triggers and sensor names
+        self.check_sensors_and_triggers(self.trigger_points, self.sensor_names)
+
+        # check single settings
+        for opt in ['hysteresis', 'enabled', 'override_profile', 'current_profile']:
             val = eval('self.' + opt)
-            lmin, lmax = self.get_setting_limits(opt)
-            if val < lmin or val > lmax:
-                if val < lmin:
-                    val = lmin
-                if val > lmax:
-                    val = lmax
-                exec 'self.' + opt + ' = ' + str(val)
+            self.check_setting(opt, val)
 
     def verify_profile_overridden(self):
         """verifies that override_profile is true, raises ProfileNotOverriddenException if it is not"""
         if not self.override_profile:
             raise ProfileNotOverriddenException()
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='i')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='i')
     def get_sensor_count(self):
         """returns the count of sensors"""
         return len(self.sensor_names)
 
-    # TODO: needs to be improved
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='s', out_signature='ad')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='s', out_signature='ad')
     def get_setting_limits(self, opt):
         """returns the limits (min, max) of the given option"""
-        if opt == 'hysteresis':
-            return [0, 10]
+        if opt in self.option_limits:
+            return self.option_limits[opt]
         else:
-            return None
+            raise SyntaxError(
+                'The settings ' + str(opt) + ' doesn\'t exist')
 
-    # TODO: needs to be improved
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='a{si}')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{si}')
     def get_settings(self):
         """returns the settings"""
         ret = {'hysteresis': self.hysteresis,
@@ -275,29 +322,35 @@ class Settings(dbus.service.Object):
                'override_profile': int(self.override_profile)}
         return ret
 
-    # TODO: needs to be improved
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='a{si}', out_signature='')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='a{ss}', out_signature='')
     def set_settings(self, tset):
         """sets the settings"""
-        try:
-            if 'override_profile' in tset:
-                self.override_profile = bool(tset['override_profile'])
-            if 'enabled' in tset:
-                self.enabled = bool(tset['enabled'])
-            if 'hysteresis' in tset:
-                self.verify_profile_overridden()
-                self.hysteresis = tset['hysteresis']
-        except ValueError, ex:
-            print 'Error parsing parameters: ', ex
-            pass
-        finally:
-            self.verify()
-            self.save()
-            if not self.override_profile:
-                self.load_profile()
-                self.verify()
+        # check that all the settings are ok
+        for setting in tset:
+            val = tset[setting]
+            if setting['bool', 'enabled', 'override_profile']:
+                val = bool(val)
+            if setting['hysteresis']:
+                val = int(val)
+            self.check_setting(setting, val)
+        # now let us set the values
+        if 'enabled' in tset:
+            self.enabled = bool(tset['enabled'])
+        if 'override_profile' in tset:
+            self.override_profile = bool(tset['override_profile'])
+        if 'hysteresis' in tset:
+            self.verify_profile_overridden()
+            self.hysteresis = int(tset['hysteresis'])
+        if 'current_profile' in tset:
+            self.verify_profile_overridden()
+            self.current_profile = tset['current_profile']
 
-    @dbus.service.method('org.thinkpad.fancontrol.Settings', in_signature='', out_signature='s')
+        if self.enabled and self.override_profile:
+            self.load_profile()
+        self.verify_tpfancod_settings()
+        self.save()
+
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='s')
     def get_profile_string(self):
         """returns the current profile as a string"""
         res = ''
@@ -358,7 +411,7 @@ class Settings(dbus.service.Object):
                 if current_profile.has_option('General', 'comment'):
                     settings_from_profile['comment'] = current_profile.get(
                         'General', 'comment')
-                    # verify that comment is valid unicode, otherwise
+                    # verify_tpfancod_settings that comment is valid unicode, otherwise
                     # use Latin1 coding
                     try:
                         unicode(settings_from_profile['comment'])
@@ -388,28 +441,21 @@ class Settings(dbus.service.Object):
                 for sensor in current_profile.options('Sensors'):
                     if self.debug:
                         print "Parsing sensor " + sensor
+                    if not sensor.startswith('ibm_thermal_sensor') and not sensor.startswith('/'):
+                        continue
+                    tid_conf = ast.literal_eval(
+                        current_profile.get('Sensors', sensor))
+                    trigger_dict = tid_conf['triggers']
 
-                    if 'ibm_thermal_sensor' in sensor:
+                    if sensor.startswith('ibm_thermal_sensor'):
                         tid = int(sensor.split('_')[3])
-                        tid_conf = ast.literal_eval(
-                            current_profile.get('Sensors', sensor))
-                        trigger_dict = tid_conf['triggers']
-                        if len(trigger_dict) > 0:
-                            trigger_points[tid] = trigger_dict
                         sensor_names[tid] = tid_conf['name']
+                        trigger_points[tid] = trigger_dict
 
-                    if '/' in sensor:
-                        if not os.path.isfile(sensor):
-                            print 'sensor %s doesn\'t exist' % sensor
-                            raise IOError
-                        tid = sensor
-                        tid_conf = ast.literal_eval(
-                            current_profile.get('Sensors', sensor))
-                        trigger_dict = tid_conf['triggers']
-                        if len(trigger_dict) > 0:
-                            trigger_points[tid] = trigger_dict
-                        sensor_names[tid] = tid_conf['name']
-                        sensor_scalings[tid] = tid_conf['scaling']
+                    if sensor.startswith('/'):
+                        sensor_names[sensor] = tid_conf['name']
+                        sensor_scalings[sensor] = tid_conf['scaling']
+                        trigger_points[sensor] = trigger_dict
 
                 settings_from_profile['trigger_points'] = trigger_points
                 settings_from_profile['sensor_names'] = sensor_names
@@ -535,58 +581,37 @@ class Settings(dbus.service.Object):
 
     def load_config(self, settings_from_config):
         """apply settings from a config"""
-        if settings_from_config['status'] and self.verify_config(settings_from_config):
+        self.verify_config(settings_from_config)
+        if settings_from_config['status']:
             self.enabled = settings_from_config['enabled']
             self.override_profile = settings_from_config['override_profile']
             self.current_profile = settings_from_config['current_profile']
+
         else:
-            print 'Error loading values from ' + settings_from_config['file_path']
-            return False
-        return True
+            raise SyntaxError(
+                'Error loading values from ' + settings_from_config['file_path'])
 
     def load_profile(self, settings_from_profile):
         """apply settings from a profile"""
-        if settings_from_profile['status'] and self.verify_profile(settings_from_profile):
+        self.verify_profile(settings_from_profile)
+        if settings_from_profile['status']:
             self.profile_comment = settings_from_profile['comment']
             self.hysteresis = settings_from_profile['hysteresis']
             self.trigger_points = settings_from_profile['trigger_points']
             self.sensor_names = settings_from_profile['sensor_names']
             self.sensor_scalings = settings_from_profile['sensor_scalings']
         else:
-            print 'Error loading values from ' + settings_from_profile['file_path']
-            return False
-        return True
-
-        profile_file_list, self.loaded_profiles, self.id_match = self.get_profile_file_list()
-        if not self.override_profile:
-            self.sensor_names = {}
-            self.trigger_points = {}
-            self.hysteresis = -1
-            self.profile_comment = ''
-            for path in profile_file_list:
-                try:
-                    # only show comment of profile that matches notebook model
-                    # best
-                    self.profile_comment = ''
-
-                    self.read_profile(path)
-                except Exception, ex:
-                    print 'Error loading ', path, ': ', ex
+            raise SyntaxError(
+                'Error loading values from ' + settings_from_profile['file_path'])
 
     def verify_config(self, settings_from_config):
         """checks that settings form a configuration file are correct"""
-        # Stub
-        # TODO: proper checks
-        return True
+        for opt in ['enabled', 'override_profile', 'current_profile']:
+            self.check_setting(opt, settings_from_config[opt])
 
-    def verify_profile(self, settings_from_config):
+    def verify_profile(self, settings_from_profile):
         """checks that settings form a profile file are correct"""
-        # Stub
-        # TODO: proper checks
-        return True
-
-    def verify_setting(self, setting_name, setting_value):
-        """checks that a single setting is correct"""
-        # Stub
-        # TODO: proper checks
-        return True
+        self.check_sensors_and_triggers(settings_from_profile['trigger_points'],
+                                        settings_from_profile['sensor_names'])
+        for opt in ['hysteresis']:
+            self.check_setting(opt, settings_from_profile[opt])

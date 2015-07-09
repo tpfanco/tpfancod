@@ -7,7 +7,7 @@
   <vendor_url>https://github.com/vsht/tpfanco</vendor_url>
   <icon_name>tpfan-admin</icon_name>
 
-  <action id="org.tpfanco.settings">
+  <action id="org.tpfanco.tpfand">
     <description>Change fan control</description>
     <message>Change fan control</message>
     <message xml:lang="de">Lüftersteuerung ändern</message>

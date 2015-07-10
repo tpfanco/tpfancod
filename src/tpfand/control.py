@@ -114,7 +114,9 @@ class Control(dbus.service.Object):
             tempfile = open(self.act_settings.ibm_thermal, 'r')
             elements = tempfile.readline().split()[1:]
             tempfile.close()
-            res = dict(enumerate(elements))
+            for idx, val in enumerate(elements):
+                if val in self.act_settings.trigger_points:
+                    res[str(idx)] = val
         except IOError, e:
             # sometimes read fails during suspend/resume
             raise UnavailableException(e.message)

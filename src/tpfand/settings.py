@@ -114,7 +114,9 @@ class Settings(dbus.service.Object):
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='b')
     def is_profile_exactly_matched(self):
         """returns True if profile exactly matches hardware"""
-        return self.id_match
+        # TODO: Need to fix this
+        return True
+        # return self.id_match
 
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='')
     def load(self):
@@ -141,8 +143,8 @@ class Settings(dbus.service.Object):
                 self.load_profile(self.read_profile(
                     self.get_profile_path(self.current_profile)))
             else:
-                profile_from_db, _, id_match = self.get_profile_file_list()
-                if id_match:
+                profile_from_db, _, self.id_match = self.get_profile_file_list()
+                if self.id_match:
                     self.load_profile(self.read_profile(
                         profile_from_db))
 
@@ -169,12 +171,12 @@ class Settings(dbus.service.Object):
         #        profiles.append(path[len(model_dir):])
 
         # try matching model id
-        id_match = False
+        self.id_match = False
         model_path = self.supplied_profile_dir + self.product_id
         if os.path.isfile(model_path):
             profile_file = model_path
             profile = model_path[len(model_path):]
-            id_match = True
+            self.id_match = True
 
         return profile_file, profile, id_match
 
@@ -205,7 +207,7 @@ class Settings(dbus.service.Object):
             self.product_pretty_name = ''
             self.product_pretty_id = ''
 
-    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{is}')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{ss}')
     def get_sensor_names(self):
         """returns the sensor names"""
         return self.sensor_names
@@ -218,7 +220,7 @@ class Settings(dbus.service.Object):
         self.verify_tpfancod_settings()
         self.save()
 
-    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{ia{ii}}')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{sa{ii}}')
     def get_trigger_points(self):
         """returns the temperature trigger points for the sensors"""
         return self.trigger_points

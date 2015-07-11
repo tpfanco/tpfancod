@@ -1,0 +1,17 @@
+[Unit]
+Description=tpfancod is a fan control daemon for ThinkPad notebooks
+After=syslog.target
+
+[Service]
+Type=dbus
+BusName=org.tpfanco.tpfancod
+ExecStart=/usr/sbin/tpfancod
+PIDFile=/var/run/tpfancod.pid
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+

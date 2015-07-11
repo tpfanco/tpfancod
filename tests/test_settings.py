@@ -4,45 +4,45 @@ import unittest
 
 import dbus.mainloop.glib
 
-from tpfand import settings as tpfandSettings
+from tpfancod import settings as tpfancodSettings
 
 
 class SettingsTestCase(unittest.TestCase):
 
     def setUp(self):
 
-        tpfandSettingsSettings = tpfandSettings.Settings
+        tpfancodSettingsSettings = tpfancodSettings.Settings
         try:
             os.makedirs('/tmp/etc/tpfancod/')
-            os.makedirs('/tmp/usr/share/tpfacod-profiles/')
+            os.makedirs('/tmp/usr/share/tpfancod-profiles/')
         except OSError as exception:
             if exception.errno != errno.EEXIST:
                 raise
 
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.system_bus = dbus.SystemBus()
-        self.settings = tpfandSettingsSettings(self.system_bus, '/Settings',
-                                               # debug
-                                               False,
-                                               # quiet
-                                               False,
-                                               # no_ibm_thermal
-                                               False,
-                                               '1.0.0',  # version
-                                               # config_path
-                                               '/tmp/etc/tpfancod/settings.conf',
-                                               # current_profile
-                                               'profile_standard',
-                                               # ibm_fan
-                                               '/proc/acpi/ibm/fan',
-                                               # ibm_thermal
-                                               '/proc/acpi/ibm/thermal',
-                                               # supplied_profile_dir
-                                               '/tmp/usr/share/tpfacod-profiles/',
-                                               # poll_time
-                                               3500,
-                                               # watchdog_time
-                                               5)
+        self.settings = tpfancodSettingsSettings(self.system_bus, '/Settings',
+                                                 # debug
+                                                 False,
+                                                 # quiet
+                                                 False,
+                                                 # no_ibm_thermal
+                                                 False,
+                                                 '1.0.0',  # version
+                                                 # config_path
+                                                 '/tmp/etc/tpfancod/settings.conf',
+                                                 # current_profile
+                                                 'profile_standard',
+                                                 # ibm_fan
+                                                 '/proc/acpi/ibm/fan',
+                                                 # ibm_thermal
+                                                 '/proc/acpi/ibm/thermal',
+                                                 # supplied_profile_dir
+                                                 '/tmp/usr/share/tpfancod-profiles/',
+                                                 # poll_time
+                                                 3500,
+                                                 # watchdog_time
+                                                 5)
 
     def tearDown(self):
         # It's important that we call remove_from_connection() here,
@@ -64,7 +64,7 @@ class SettingsTestCase(unittest.TestCase):
         self.assertEqual(self.settings.ibm_fan, '/proc/acpi/ibm/fan')
         self.assertEqual(self.settings.ibm_thermal, '/proc/acpi/ibm/thermal')
         self.assertEqual(
-            self.settings.supplied_profile_dir, '/tmp/usr/share/tpfacod-profiles/')
+            self.settings.supplied_profile_dir, '/tmp/usr/share/tpfancod-profiles/')
         self.assertEqual(self.settings.poll_time, 3500)
         self.assertEqual(self.settings.watchdog_time, 5)
 

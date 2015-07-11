@@ -27,15 +27,15 @@ import sys
 
 import dbus.mainloop.glib
 import gobject
-from tpfand import settings, control
+from tpfancod import settings, control
 
 if not ('/usr/lib/python2.7/site-packages' in sys.path):
     sys.path.append('/usr/lib/python2.7/site-packages')
 
 
-class Tpfand(object):
+class Tpfancod(object):
 
-    """main tpfand process"""
+    """main tpfancod process"""
 
     controller = None
 
@@ -62,10 +62,10 @@ class Tpfand(object):
     ibm_thermal = '/proc/acpi/ibm/thermal'
 
     # path to the directory that contains profiles
-    supplied_profile_dir = '/usr/share/tpfacod-profiles/'
+    supplied_profile_dir = '/usr/share/tpfancod-profiles/'
 
     # path to pid file
-    pid_path = '/var/run/tpfand.pid'
+    pid_path = '/var/run/tpfancod.pid'
 
     # poll time
     poll_time = 3500
@@ -118,7 +118,7 @@ class Tpfand(object):
         """daemon start function"""
 
         if not self.quiet:
-            print 'tpfand ' + self.version + ' - Copyright (C) 2011-2015 Vladyslav Shtabovenko'
+            print 'tpfancod ' + self.version + ' - Copyright (C) 2011-2015 Vladyslav Shtabovenko'
             print 'Copyright (C) 2007-2008 Sebastian Urban'
             print 'This program comes with ABSOLUTELY NO WARRANTY'
             print
@@ -250,7 +250,7 @@ class Tpfand(object):
 
 def main():
 
-    app = Tpfand()
+    app = Tpfancod()
 
 if __name__ == '__main__':
     main()

@@ -27,7 +27,7 @@ sections describe manual installation via `make`
 * Run
     ```
     sudo make install-systemd
-    sudo systemctl enable tpfand
+    sudo systemctl enable tpfancod
     ```
 
 * Reboot your system to reload `thinkpad_acpi` module with the
@@ -35,7 +35,7 @@ sections describe manual installation via `make`
 
 * Check that tpfanco is running properly via
     ```
-    systemctl status tpfand
+    systemctl status tpfancod
     ```
 ## sysvinit based distributions
 
@@ -59,7 +59,7 @@ sections describe manual installation via `make`
 
 * The configuration file is `/etc/tpfancod/settings.conf`.
   After manual changes to this configuration file tpfancod must
-  be restarted (e.g. via ` sudo systemctl restart tpfand`)
+  be restarted (e.g. via ` sudo systemctl restart tpfancod`)
 
 * To allow tpfancod control your fan, you must change both `enabled` and
   `override_profile` to `True`

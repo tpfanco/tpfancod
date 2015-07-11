@@ -1,0 +1,42 @@
+#!/bin/sh
+# Start/stop the ThinkPad fan control daemon.
+#
+### BEGIN INIT INFO
+# Provides:          tpfancod
+# Required-Start:    $remote_fs $syslog $time
+# Required-Stop:     $remote_fs $syslog $time
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: ThinkPad Fan Control daemon
+# Description:       tpfancod controls the fan speed of an IBM/Lenovo ThinkPad
+#                                notebook. It can be configured by running tpfanco-admin.
+### END INIT INFO
+
+test -f /usr/sbin/tpfancod || exit 0
+
+. /lib/lsb/init-functions
+
+case "$1" in
+start)  log_daemon_msg "Starting ThinkPad fan control daemon" "tpfancod"
+        start-stop-daemon --start --quiet --pidfile /var/run/tpfancod.pid --name tpfancod --startas /usr/sbin/tpfancod -- $LSBNAMES --quiet
+        log_end_msg $?
+        ;;
+stop)   log_daemon_msg "Stopping ThinkPad fan control daemon" "tpfancod"
+        start-stop-daemon --stop --quiet --pidfile /var/run/tpfancod.pid
+                rm -f /var/run/tpfancod.pid
+        log_end_msg $?
+        ;;
+restart) log_daemon_msg "Restarting ThinkPad fan control daemon" "tpfancod"
+        start-stop-daemon --stop --retry 5 --quiet --pidfile /var/run/tpfancod.pid
+                rm -f /var/run/tpfancod.pid
+        start-stop-daemon --start --quiet --pidfile /var/run/tpfancod.pid --name tpfancod --startas /usr/sbin/tpfancod -- $LSBNAMES
+        log_end_msg $?
+        ;;
+force-reload)
+        $0 restart
+        ;;
+*)      log_action_msg "Usage: /etc/init.d/tpfancod {start|stop|restart}"
+        exit 2
+        ;;
+esac
+exit 0

@@ -5,9 +5,9 @@
 <policyconfig>
   <vendor>Tpfanco</vendor>
   <vendor_url>https://github.com/vsht/tpfanco</vendor_url>
-  <icon_name>tpfan-admin</icon_name>
+  <icon_name>tpfanco-admin</icon_name>
 
-  <action id="org.tpfanco.tpfand">
+  <action id="org.tpfanco.tpfancod">
     <description>Change fan control</description>
     <message>Change fan control</message>
     <message xml:lang="de">Lüftersteuerung ändern</message>

@@ -47,6 +47,7 @@ class Settings(dbus.service.Object):
     # profile / user overrideable options
     sensor_names = {}
     trigger_points = {}
+    sensor_scalings = {}
     hysteresis = 2
 
     # hardware product info
@@ -75,6 +76,7 @@ class Settings(dbus.service.Object):
         self.supplied_profile_dir = supplied_profile_dir
         self.poll_time = poll_time
         self.watchdog_time = watchdog_time
+        self.id_match = False
 
         self.profile_path = os.path.split(
             config_path)[0] + '/' + self.current_profile
@@ -114,9 +116,7 @@ class Settings(dbus.service.Object):
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='b')
     def is_profile_exactly_matched(self):
         """returns True if profile exactly matches hardware"""
-        # TODO: Need to fix this
-        return True
-        # return self.id_match
+        return self.id_match
 
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='')
     def load(self):
@@ -136,49 +136,40 @@ class Settings(dbus.service.Object):
         # load the configuration
 
         self.load_config(self.read_config(self.config_path))
+        self.auto_load_profile()
+        self.verify_tpfancod_settings()
 
+    def auto_load_profile(self):
         # load the profile
         if self.enabled:
             if self.override_profile:
                 self.load_profile(self.read_profile(
                     self.get_profile_path(self.current_profile)))
             else:
-                profile_from_db, _, self.id_match = self.get_profile_file_list()
-                if self.id_match:
+                profile_from_db, id_match = self.get_profile_file_list()
+                if id_match:
+                    self.id_match = True
                     self.load_profile(self.read_profile(
                         profile_from_db))
-
-        self.verify_tpfancod_settings()
+                else:
+                    self.id_match = False
 
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='')
     def save(self):
-        """saves config to disk"""
+        """saves configuration and profile to disk"""
+        self.write_config(self.config_path)
         self.write_profile(self.profile_path)
 
-    # TODO: needs to be improved
     def get_profile_file_list(self):
         """returns a list of profile files to load for this system"""
-
         profile_file = ''
-        profile = ''
-
-        # match parts of product name
-        #product_path = product_name_dir + self.product_name
-        # for n in range(len(product_name_dir) + 1, len(product_path)):
-        #    path = product_path[0:n]
-        #    if os.path.isfile(path):
-        #        files.append(path)
-        #        profiles.append(path[len(model_dir):])
-
-        # try matching model id
-        self.id_match = False
+        id_match = False
         model_path = self.supplied_profile_dir + self.product_id
+        self.logger.debug('Looking for a profile in ' + model_path)
         if os.path.isfile(model_path):
             profile_file = model_path
-            profile = model_path[len(model_path):]
-            self.id_match = True
-
-        return profile_file, profile, id_match
+            id_match = True
+        return profile_file, id_match
 
     def read_model_info(self):
         """reads model info from /sys/class/dmi/id"""
@@ -225,28 +216,43 @@ class Settings(dbus.service.Object):
         """returns the temperature trigger points for the sensors"""
         return self.trigger_points
 
-    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='a{ia{ii}}', out_signature='')
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='a{sa{ii}}', out_signature='b')
     def set_trigger_points(self, tset):
         """sets the temperature trigger points for the sensors"""
         self.verify_profile_overridden()
+        self.check_sensors_and_triggers(
+            tset, self.sensor_names, self.sensor_scalings)
         self.trigger_points = tset
         self.verify_tpfancod_settings()
         self.save()
+        # now load new custom profile into memory
+        self.load()
 
     def get_profile_path(self, profile):
         return os.path.split(
             self.config_path)[0] + '/' + profile
 
-    def check_sensors_and_triggers(self, trigger_points, sensor_names):
+    def check_sensors_and_triggers(self, trigger_points, sensor_names, sensor_scalings={}):
         '''Verifies that given sensors, triggers and sensor names are valid'''
 
         if sorted(trigger_points.keys()) != sorted(sensor_names.keys()):
             raise SyntaxError(
                 'The number of sensors and sensor names do not match')
         for sensor in trigger_points:
-            if not sensor.isdigit() and not os.path.isfile(sensor):
-                raise SyntaxError(
-                    'The sensor ' + sensor + 'doesn\'t exist')
+
+            # some special checks for hwmon senesors
+            if not sensor.isdigit():
+                if not os.path.isfile(sensor):
+                    raise SyntaxError(
+                        'The sensor ' + sensor + 'doesn\'t exist')
+
+                if sensor not in sensor_scalings:
+                    raise SyntaxError(
+                        'Missing the scaling factor for the sensor' + sensor)
+                else:
+                    if not isinstance(sensor_scalings[sensor], float):
+                        raise SyntaxError(
+                            'The scaling factor' + sensor_scalings[sensor] + ' for the sensor' + sensor + ' is not float')
 
             if len(sensor_names[sensor].strip()) == 0:
                 raise SyntaxError(
@@ -265,7 +271,7 @@ class Settings(dbus.service.Object):
                 if not isinstance(fan_level, (int, long)):
                     raise SyntaxError(
                         'The fan level ' + str(fan_level) + 'is not an integer')
-                if fan_level > 255 or fan_level < 0:
+                if fan_level > 256 or fan_level < 0:
                     raise SyntaxError(
                         'The fan_level ' + str(fan_level) + 'is out of bounds')
 
@@ -295,7 +301,8 @@ class Settings(dbus.service.Object):
         """Verifies that all settings of tpfancod are valid"""
 
         # check sensors, triggers and sensor names
-        self.check_sensors_and_triggers(self.trigger_points, self.sensor_names)
+        self.check_sensors_and_triggers(
+            self.trigger_points, self.sensor_names, self.sensor_scalings)
 
         # check single settings
         for opt in ['hysteresis', 'enabled', 'override_profile', 'current_profile']:
@@ -319,43 +326,51 @@ class Settings(dbus.service.Object):
             return self.option_limits[opt]
         else:
             raise SyntaxError(
-                'The settings ' + str(opt) + ' doesn\'t exist')
+                'The settings ' + str(opt) + ' does not exist')
 
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{si}')
     def get_settings(self):
         """returns the settings"""
         ret = {'hysteresis': self.hysteresis,
                'enabled': int(self.enabled),
-               'override_profile': int(self.override_profile)}
+               'override_profile': int(self.override_profile),
+               'poll_time': int(self.poll_time)}
         return ret
 
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='a{ss}', out_signature='')
     def set_settings(self, tset):
         """sets the settings"""
-        # check that all the settings are ok
+        # check that all the settings are OK
         for setting in tset:
             val = tset[setting]
-            if setting['bool', 'enabled', 'override_profile']:
-                val = bool(val)
-            if setting['hysteresis']:
-                val = int(val)
+            if setting in ['enabled', 'override_profile', 'hysteresis']:
+                val = ast.literal_eval(val)
             self.check_setting(setting, val)
         # now let us set the values
+        self.logger.debug(
+            'Updating settings to ' + str(tset))
         if 'enabled' in tset:
-            self.enabled = bool(tset['enabled'])
+            self.logger.debug(
+                'Changing enabled to ' + str(ast.literal_eval(tset['enabled'])))
+            self.enabled = ast.literal_eval(tset['enabled'])
         if 'override_profile' in tset:
-            self.override_profile = bool(tset['override_profile'])
+            self.logger.debug(
+                'Changing override_profile to ' + str(ast.literal_eval(tset['override_profile'])))
+            self.override_profile = ast.literal_eval(tset['override_profile'])
         if 'hysteresis' in tset:
             self.verify_profile_overridden()
-            self.hysteresis = int(tset['hysteresis'])
+            self.logger.debug(
+                'Changing hysteresis to ' + str(ast.literal_eval(tset['hysteresis'])))
+            self.hysteresis = ast.literal_eval(tset['hysteresis'])
         if 'current_profile' in tset:
             self.verify_profile_overridden()
+            self.logger.debug(
+                'Changing current_profile to ' + str(ast.literal_eval(tset['current_profile'])))
             self.current_profile = tset['current_profile']
-
-        if self.enabled and self.override_profile:
-            self.load_profile()
         self.verify_tpfancod_settings()
         self.save()
+        # now load new custom profile into memory
+        self.load()
 
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='s')
     def get_profile_string(self):
@@ -441,6 +456,7 @@ class Settings(dbus.service.Object):
                 trigger_points = {}
                 sensor_names = {}
                 sensor_scalings = {}
+
                 for sensor in current_profile.options('Sensors'):
 
                     self.logger.debug('Parsing sensor ' + sensor)
@@ -514,7 +530,7 @@ class Settings(dbus.service.Object):
                 '# This file provides the general configuration of tpfancod')
             config_file.write('\n\n\n')
             current_config.write(config_file)
-            # config_file.close()
+            config_file.close()
 
         except Exception, e:
             print 'Error writing config file: %s' % path
@@ -537,7 +553,8 @@ class Settings(dbus.service.Object):
             current_profile.add_section('General')
             current_profile.set('General',
                                 '# Short description of the purpose of this profile.')
-            current_profile.set('General', 'comment', self.profile_comment)
+            current_profile.set(
+                'General', 'comment', self.profile_comment)
             current_profile.set('General', '# System manufacturer')
             current_profile.set(
                 'General', 'product_vendor', self.product_pretty_vendor)
@@ -547,20 +564,27 @@ class Settings(dbus.service.Object):
             current_profile.set('General', '# Machine type')
             current_profile.set(
                 'General', 'product_id', self.product_pretty_id)
-
             current_profile.add_section('Options')
             current_profile.set('Options',
                                 '# Set the hysteresis temperature difference.')
-            current_profile.set('Options', 'hysteresis', str(self.hysteresis))
-
+            current_profile.set(
+                'Options', 'hysteresis', str(self.hysteresis))
             current_profile.add_section('Sensors')
 
             for sensor_id in set(self.sensor_names.keys()):
-                current_profile.set('Sensors', 'ibm_thermal_sensor' + str(sensor_id), str(
-                    {'name': self.sensor_names[sensor_id], 'triggers': self.trigger_points[sensor_id]}))
+                ntp = {}
+                for tp in self.trigger_points[sensor_id]:
+                    ntp[int(tp)] = int(self.trigger_points[sensor_id][tp])
+
+                if sensor_id.isdigit():
+                    current_profile.set('Sensors', 'ibm_thermal_sensor' + str(sensor_id), str(
+                        {'name': self.sensor_names[sensor_id], 'triggers': ntp}))
+                else:
+                    current_profile.set('Sensors', str(sensor_id), str(
+                        {'name': self.sensor_names[sensor_id], 'scaling': self.sensor_scalings[sensor_id], 'triggers': ntp}))
 
         except Exception, e:
-            print 'Error reading curent profile'
+            print 'Error writing curent profile'
             print e
             return False
 
@@ -613,6 +637,7 @@ class Settings(dbus.service.Object):
     def verify_profile(self, settings_from_profile):
         """checks that settings form a profile file are correct"""
         self.check_sensors_and_triggers(settings_from_profile['trigger_points'],
-                                        settings_from_profile['sensor_names'])
+                                        settings_from_profile['sensor_names'],
+                                        settings_from_profile['sensor_scalings'])
         for opt in ['hysteresis']:
             self.check_setting(opt, settings_from_profile[opt])

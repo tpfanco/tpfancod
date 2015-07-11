@@ -20,6 +20,8 @@
 #
 
 import logging
+import os
+import signal
 import dbus.service
 import gobject
 
@@ -221,8 +223,10 @@ class Control(dbus.service.Object):
         self.logger.debug('Polling the sensors')
         self.logger.debug(
             'Current fan level: ' + str(fan_state['level']) + ' (' + str(fan_state['rpm']) + ' RPM)')
-
-        if self.act_settings.enabled:
+        # fan control is activated only if it is enabled and there is a profile
+        # or the user specified to override existing profile
+        if (self.act_settings.enabled and self.act_settings.is_profile_exactly_matched()) or (self.act_settings.enabled and self.act_settings.override_profile):
+            self.logger.debug('Fan control enabled')
             try:
                 temps = self.get_temperatures()
             except UnavailableException:
@@ -231,77 +235,82 @@ class Control(dbus.service.Object):
                 self.repoll(self.act_settings.poll_time)
                 return False
 
-            new_speed = -1
-            self.logger.debug('Current ibm_thermal sensor values:')
-            self.logger.debug(temps)
-            for tid in temps:
-                # we look only at the sensors that are listed in the profile
-                if tid in self.act_settings.trigger_points and tid.isdigit():
-                    temp = temps[tid]
-                    # value is +/-128 or 0, if sensor is disconnected
-                    if abs(temp) != 128 and abs(temp) != 0:
-                        points = self.act_settings.trigger_points[tid]
-                        speed = 0
+            new_speed = 0
+            # check that we have at leat one temperature sensor to monitor
+            if len(temps) != 0:
+
+                for tid in temps:
+                    # we look only at the sensors that are listed in the
+                    # profile
+                    if tid in self.act_settings.trigger_points and tid.isdigit():
                         self.logger.debug(
-                            'Sensor ' + str(tid) + ': ' + str(temp))
+                            'ibm_thermal sensor: ' + tid + ' has value ' + str(temps[tid]))
+                        temp = temps[tid]
+                        # value is +/-128 or 0, if sensor is disconnected
+                        if abs(temp) != 128 and abs(temp) != 0:
+                            points = self.act_settings.trigger_points[tid]
+                            speed = 0
+                            self.logger.debug(
+                                'Sensor ' + str(tid) + ': ' + str(temp))
+                            # check if temperature is above hysteresis shutdown
+                            # point
+                            if tid in self.current_trip_temps:
+                                if temp >= self.current_trip_temps[tid]:
+                                    speed = self.current_trip_speeds[tid]
+                                else:
+                                    del self.current_trip_temps[tid]
+                                    del self.current_trip_speeds[tid]
+
+                            # check if temperature is over trigger point
+                            for trigger_temp, trigger_speed in points.iteritems():
+                                if temp >= trigger_temp and speed < trigger_speed:
+                                    self.current_trip_temps[
+                                        tid] = trigger_temp - self.act_settings.hysteresis
+                                    self.current_trip_speeds[
+                                        tid] = trigger_speed
+                                    speed = trigger_speed
+
+                            new_speed = max(new_speed, speed)
+
+                # we look only at the sensors that are listed in the profile
+                for sensor in temps:
+                    if not sensor.isdigit():
+                        self.logger.debug(
+                            'hwmon sensor: ' + sensor + ' has value ' + str(temps[sensor]))
+                        temp = temps[sensor]
+                        # value is 0, if sensor is disconnected
+                        points = self.act_settings.trigger_points[sensor]
+                        speed = 0
                         # check if temperature is above hysteresis shutdown
                         # point
-                        if tid in self.current_trip_temps:
-                            if temp >= self.current_trip_temps[tid]:
-                                speed = self.current_trip_speeds[tid]
+                        if sensor in self.current_trip_temps:
+                            if temp >= self.current_trip_temps[sensor]:
+                                speed = self.current_trip_speeds[sensor]
                             else:
-                                del self.current_trip_temps[tid]
-                                del self.current_trip_speeds[tid]
+                                del self.current_trip_temps[sensor]
+                                del self.current_trip_speeds[sensor]
 
                         # check if temperature is over trigger point
                         for trigger_temp, trigger_speed in points.iteritems():
                             if temp >= trigger_temp and speed < trigger_speed:
                                 self.current_trip_temps[
-                                    tid] = trigger_temp - self.act_settings.hysteresis
-                                self.current_trip_speeds[tid] = trigger_speed
+                                    sensor] = trigger_temp - self.act_settings.hysteresis
+                                self.current_trip_speeds[
+                                    sensor] = trigger_speed
                                 speed = trigger_speed
 
                         new_speed = max(new_speed, speed)
-            self.logger.debug('Current hwmon sensor values:')
-
-            # we look only at the sensors that are listed in the profile
-            for sensor in temps:
-                if not sensor.isdigit():
-                    temp = temps[sensor]
-                    # value is 0, if sensor is disconnected
-
-                    points = self.act_settings.trigger_points[sensor]
-                    speed = 0
-                    self.logger.debug(
-                        '    Sensor ' + str(sensor) + ': ' + str(temp))
-                    # check if temperature is above hysteresis shutdown point
-                    if sensor in self.current_trip_temps:
-                        if temp >= self.current_trip_temps[sensor]:
-                            speed = self.current_trip_speeds[sensor]
-                        else:
-                            del self.current_trip_temps[sensor]
-                            del self.current_trip_speeds[sensor]
-
-                    # check if temperature is over trigger point
-                    for trigger_temp, trigger_speed in points.iteritems():
-                        if temp >= trigger_temp and speed < trigger_speed:
-                            self.current_trip_temps[
-                                sensor] = trigger_temp - self.act_settings.hysteresis
-                            self.current_trip_speeds[sensor] = trigger_speed
-                            speed = trigger_speed
-
-                    new_speed = max(new_speed, speed)
-            self.logger.debug(
-                'Trying to set fan level to ' + str(new_speed) + ':')
-            # for the case that there are no active sensors we let the EC control
-            # overtake
-            if new_speed == -1:
+                self.logger.debug(
+                    'Trying to set fan level to ' + str(new_speed) + ':')
+            else:
+                self.logger.debug(
+                    'No sensors to monitor, giving fan control back to the EC control ')
                 new_speed = 255
             # set fan speed
             self.set_speed(new_speed)
             self.repoll(self.act_settings.poll_time)
         else:
-            # fan control disabled
+            self.logger.debug('Fan control disabled')
             self.set_speed(255)
             self.repoll(self.act_settings.poll_time)
 

@@ -250,7 +250,7 @@ class Tpfancod(object):
 
 def main():
 
-    app = Tpfancod()
+    Tpfancod()
 
 if __name__ == '__main__':
     main()

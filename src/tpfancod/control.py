@@ -20,8 +20,6 @@
 #
 
 import logging
-import os
-import signal
 import dbus.service
 import gobject
 
@@ -117,7 +115,7 @@ class Control(dbus.service.Object):
             elements = tempfile.readline().split()[1:]
             tempfile.close()
             for idx, val in enumerate(elements):
-                if val in self.act_settings.trigger_points:
+                if str(idx) in self.act_settings.trigger_points:
                     res[str(idx)] = val
         except IOError, e:
             # sometimes read fails during suspend/resume
@@ -131,7 +129,7 @@ class Control(dbus.service.Object):
         for sensor in self.act_settings.trigger_points:
             # string are assumed to be from hwmon, while ints are from
             # ibm_thermal
-            if type(sensor) is str:
+            if not sensor.isdigit():
                 try:
                     tempfile = open(sensor, 'r')
                     element = tempfile.readline()
@@ -150,6 +148,7 @@ class Control(dbus.service.Object):
                     except:
                         pass
         res = {str(x): int(y) for x, y in res.items()}
+        self.logger.debug('Output of get_temperatures ' + str(res))
         return res
 
     @dbus.service.method('org.tpfanco.tpfancod.Control', in_signature='', out_signature='a{si}')
@@ -234,7 +233,6 @@ class Control(dbus.service.Object):
                 self.set_speed(255)
                 self.repoll(self.act_settings.poll_time)
                 return False
-
             new_speed = 0
             # check that we have at leat one temperature sensor to monitor
             if len(temps) != 0:

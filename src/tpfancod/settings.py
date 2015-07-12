@@ -23,7 +23,6 @@ import StringIO
 import ast
 import logging
 import os.path
-
 import dbus.service
 
 
@@ -210,6 +209,24 @@ class Settings(dbus.service.Object):
         self.sensor_names = tset
         self.verify_tpfancod_settings()
         self.save()
+
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='a{sa{ss}}', out_signature='')
+    def add_new_sensor(self, tset):
+        """adds a new sensor"""
+        sensor_id = tset['name'].iterkeys().next()
+        new_trigger_points = {}
+
+        self.sensor_names[sensor_id] = tset['name'][sensor_id]
+
+        for n in tset[tset['name'].iterkeys().next()]:
+            new_trigger_points[int(n)] = int(
+                tset[tset['name'].iterkeys().next()][n])
+        self.trigger_points[sensor_id] = new_trigger_points
+        if tset['scaling'][sensor_id] != '':
+            self.sensor_scaling[sensor_id] = float(tset['scaling'][sensor_id])
+        self.save()
+        # now load new custom profile into memory
+        self.load()
 
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{sa{ii}}')
     def get_trigger_points(self):
@@ -467,7 +484,7 @@ class Settings(dbus.service.Object):
                     trigger_dict = tid_conf['triggers']
 
                     if sensor.startswith('ibm_thermal_sensor'):
-                        tid = int(sensor.split('_')[3])
+                        tid = sensor.split('_')[3]
                         sensor_names[tid] = tid_conf['name']
                         trigger_points[tid] = trigger_dict
 
@@ -575,13 +592,14 @@ class Settings(dbus.service.Object):
                 ntp = {}
                 for tp in self.trigger_points[sensor_id]:
                     ntp[int(tp)] = int(self.trigger_points[sensor_id][tp])
+                nname = str(self.sensor_names[sensor_id])
 
                 if sensor_id.isdigit():
-                    current_profile.set('Sensors', 'ibm_thermal_sensor' + str(sensor_id), str(
-                        {'name': self.sensor_names[sensor_id], 'triggers': ntp}))
+                    current_profile.set('Sensors', 'ibm_thermal_sensor_' + str(sensor_id), str(
+                        {'name': nname, 'triggers': ntp}))
                 else:
                     current_profile.set('Sensors', str(sensor_id), str(
-                        {'name': self.sensor_names[sensor_id], 'scaling': self.sensor_scalings[sensor_id], 'triggers': ntp}))
+                        {'name': nname, 'scaling': self.sensor_scalings[sensor_id], 'triggers': ntp}))
 
         except Exception, e:
             print 'Error writing curent profile'
@@ -641,3 +659,28 @@ class Settings(dbus.service.Object):
                                         settings_from_profile['sensor_scalings'])
         for opt in ['hysteresis']:
             self.check_setting(opt, settings_from_profile[opt])
+
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='as')
+    def get_available_ibm_thermal_sensors(self):
+        res = []
+        try:
+            tempfile = open(self.ibm_thermal, 'r')
+            elements = tempfile.readline().split()[1:]
+            tempfile.close()
+            for idx, val in enumerate(elements):
+                # value is +/-128 or 0, if sensor is disconnected
+                if abs(int(val)) != 128 and abs(int(val)) != 0:
+                    res.append(str(idx))
+        except IOError:
+            # sometimes read fails during suspend/resume
+            pass
+        finally:
+            try:
+                tempfile.close()
+            except:
+                pass
+        return res
+
+    @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='b')
+    def check_if_hwmon_sensor_exists(self, sensor):
+        return os.path.isfile(sensor)

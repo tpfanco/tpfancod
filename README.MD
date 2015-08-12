@@ -20,15 +20,15 @@ This project does not have any affiliation with Lenovo or IBM!
 
 ## Description
 
-Tpfanco is a free and open source fan control software for IBM/Lenovo ThinkPads running GNU/Linux. It consists of a fan control daemon and a GUI to monitor tempertature sensor values and set thresholds. For selected ThinkPad models user-generated fan profiles are available. 
+Tpfanco is a free and open source fan control software for IBM/Lenovo ThinkPads running GNU/Linux. It consists of a fan control daemon and a GUI to monitor temperature sensor values and set thresholds. For selected ThinkPad models user-generated fan profiles are available. 
 
 ## Legacy 
 
-Tpfanco is a fork of Thinkpad Fan Control ([tp-fan](https://launchpad.net/tp-fan)) by Sebastian Urban.
+Tpfanco is a fork of ThinkPad Fan Control ([tp-fan](https://launchpad.net/tp-fan)) by Sebastian Urban.
 
 ## Tpfanco daemon (tpfancod)
 
-tpfancod is the main part of tpfnaco. It is a daemon that runs in the background and controls the system fan of ThinkPad notebooks based on specified temperature profiles
+tpfancod is the main part of tpfanco. It is a daemon that runs in the background and controls the system fan of ThinkPad notebooks based on specified temperature profiles
 
 ## Requirements
 
@@ -169,7 +169,7 @@ Packages for the development version are currently not available. The following 
     
   
   
-# Licence 
+# License 
 
 tpfancod is covered by the GNU General Public License 3.
 

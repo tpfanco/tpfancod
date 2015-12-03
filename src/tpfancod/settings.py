@@ -239,6 +239,8 @@ class Settings(dbus.service.Object):
         sensor_id = tset['name'].iterkeys().next()
         new_trigger_points = {}
 
+        self.logger.debug('Adding new sensor: ' + str(tset))
+
         self.sensor_names[sensor_id] = tset['name'][sensor_id]
 
         for n in tset[tset['name'].iterkeys().next()]:
@@ -246,7 +248,13 @@ class Settings(dbus.service.Object):
                 tset[tset['name'].iterkeys().next()][n])
         self.trigger_points[sensor_id] = new_trigger_points
         if tset['scaling'][sensor_id] != '':
-            self.sensor_scaling[sensor_id] = float(tset['scaling'][sensor_id])
+            self.sensor_scalings[sensor_id] = float(
+                tset['scaling'][sensor_id])
+
+        self.logger.debug('New sensor names: ' + str(self.sensor_names))
+        self.logger.debug('New scalings: ' + str(self.sensor_scalings))
+        self.logger.debug('New trigger points: ' + str(self.trigger_points))
+
         self.save()
         # now load new custom profile into memory
         self.load()
@@ -278,6 +286,12 @@ class Settings(dbus.service.Object):
         if sorted(trigger_points.keys()) != sorted(sensor_names.keys()):
             raise SyntaxError(
                 'The number of sensors and sensor names do not match')
+
+        self.logger.debug('Verifying the profile...')
+        self.logger.debug('Sensor names: ' + str(sensor_names))
+        self.logger.debug('Trigger points: ' + str(trigger_points))
+        self.logger.debug('Sensor scalings: ' + str(sensor_scalings))
+
         for sensor in trigger_points:
 
             # some special checks for hwmon senesors
@@ -463,6 +477,7 @@ class Settings(dbus.service.Object):
             settings_from_profile['file_path'] = path
 
             current_profile = ConfigParser.SafeConfigParser()
+            current_profile.optionxform = str
             current_profile.read(path)
 
             if current_profile.has_section('General'):
@@ -590,6 +605,8 @@ class Settings(dbus.service.Object):
             current_profile = ConfigParser.SafeConfigParser(
                 allow_no_value=True)
 
+            current_profile.optionxform = str
+
             current_profile.add_section('General')
             current_profile.set('General',
                                 '# Short description of the purpose of this profile.')
@@ -625,7 +642,7 @@ class Settings(dbus.service.Object):
                         {'name': nname, 'scaling': self.sensor_scalings[sensor_id], 'triggers': ntp}))
 
         except Exception, e:
-            print 'Error writing curent profile'
+            print 'Error writing current profile'
             print e
             return False
 

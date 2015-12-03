@@ -48,6 +48,7 @@ class Settings(dbus.service.Object):
     trigger_points = {}
     sensor_scalings = {}
     hysteresis = 2
+    trial_sensor = '/sys/devices/virtual/hwmon/hwmon0/temp1_input'
 
     # hardware product info
     product_name = None
@@ -123,6 +124,8 @@ class Settings(dbus.service.Object):
 
         self.enabled = False
         self.override_profile = False
+        ibm_thermal_available = True
+        hwmon_cpu_sensor_available = True
 
         # if the configuration file is missing, create a new one
         if not os.path.isfile(self.config_path):
@@ -130,6 +133,26 @@ class Settings(dbus.service.Object):
 
         # if the standard profile is missing, create a new one
         if not os.path.isfile(self.profile_path):
+
+            # if there is no ibm thermal, let us try to guess at least one
+            # hwmon sensor
+            try:
+                tempfile = open(self.ibm_thermal, 'r')
+                tempfile.readline()
+                tempfile.close()
+            except IOError:
+                ibm_thermal_available = False
+            try:
+                tempfile = open(self.trial_sensor, 'r')
+                tempfile.readline()
+                tempfile.close()
+            except IOError:
+                hwmon_cpu_sensor_available = False
+            if not ibm_thermal_available and hwmon_cpu_sensor_available and self.sensor_names == {}:
+                self.sensor_names[self.trial_sensor] = 'CPU'
+                self.sensor_scalings[self.trial_sensor] = 0.001
+                self.trigger_points[self.trial_sensor] = {0: 255}
+
             self.write_profile(self.profile_path)
 
         # load the configuration

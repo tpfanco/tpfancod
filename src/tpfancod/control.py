@@ -110,6 +110,8 @@ class Control(dbus.service.Object):
     def get_temperatures(self):
         """returns list of current sensor readings, +/-128 or 0 means sensor is disconnected"""
         res = {}
+        # TODO: we need to be able to read the sensors even if fan control is
+        # disabled
         try:
             tempfile = open(self.act_settings.ibm_thermal, 'r')
             elements = tempfile.readline().split()[1:]
@@ -119,7 +121,10 @@ class Control(dbus.service.Object):
                     res[str(idx)] = val
         except IOError, e:
             # sometimes read fails during suspend/resume
-            raise UnavailableException(e.message)
+            if self.act_settings.trigger_points == {}:
+                raise UnavailableException(e.message)
+            else:
+                pass
         finally:
             try:
                 tempfile.close()

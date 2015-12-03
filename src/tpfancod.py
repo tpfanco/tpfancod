@@ -162,9 +162,6 @@ class Tpfancod(object):
             fanfile.flush()
             fanfile.close()
 
-            tempfile = open(self.ibm_thermal, 'r')
-            tempfile.readline()
-            tempfile.close()
             return True
         except IOError:
             return False

@@ -27,10 +27,10 @@ import sys
 
 import dbus.mainloop.glib
 import gobject
-from tpfancod import settings, control
 
 if not ('/usr/lib/python2.7/site-packages' in sys.path):
     sys.path.append('/usr/lib/python2.7/site-packages')
+from tpfancod import settings, control
 
 
 class Tpfancod(object):

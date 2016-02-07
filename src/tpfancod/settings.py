@@ -129,13 +129,21 @@ class Settings(dbus.service.Object):
 
         # if the configuration file is missing, create a new one
         if not os.path.isfile(self.config_path):
+            self.logger.debug(
+                'No configuration file found, creating a new one in ' + self.config_path + '.')
             self.write_config(self.config_path)
 
         # if the standard profile is missing, create a new one
         if not os.path.isfile(self.profile_path):
 
+            self.logger.debug(
+                'No standard profile found, creating a new one in ' + self.profile_path + '.')
+
             # if there is no ibm thermal, let us try to guess at least one
             # hwmon sensor
+            self.logger.debug(
+                'Looking for sensors that can be used for fan control...')
+
             try:
                 tempfile = open(self.ibm_thermal, 'r')
                 tempfile.readline()
@@ -148,7 +156,19 @@ class Settings(dbus.service.Object):
                 tempfile.close()
             except IOError:
                 hwmon_cpu_sensor_available = False
+
+            if ibm_thermal_available:
+                res = self.get_available_ibm_thermal_sensors()
+                self.logger.debug(
+                    'Found following ibm_thermal sensors: ' + str(res))
+
+                for sensor in res:
+                    self.sensor_names[sensor] = 'Sensor ' + sensor[-1:]
+                    self.trigger_points[sensor] = {0: 255}
+
             if not ibm_thermal_available and hwmon_cpu_sensor_available and self.sensor_names == {}:
+                self.logger.debug(
+                    'Found a working hwmon sensor: ' + self.trial_sensor)
                 self.sensor_names[self.trial_sensor] = 'CPU'
                 self.sensor_scalings[self.trial_sensor] = 0.001
                 self.trigger_points[self.trial_sensor] = {0: 255}

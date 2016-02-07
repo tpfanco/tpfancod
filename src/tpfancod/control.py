@@ -239,7 +239,7 @@ class Control(dbus.service.Object):
                 self.repoll(self.act_settings.poll_time)
                 return False
             new_speed = 0
-            # check that we have at leat one temperature sensor to monitor
+            # check that we have at least one temperature sensor to monitor
             if len(temps) != 0:
 
                 for tid in temps:

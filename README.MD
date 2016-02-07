@@ -40,6 +40,9 @@ tpfancod is the main part of tpfanco. It is a daemon that runs in the background
 
 Packages for the development version are currently not available. The following sections describe manual installation via `make`
 
+### Dependencies
+* Ubuntu users need to install the package python-gobject
+
 ### systemd based distributions
 
 * Run
@@ -173,7 +176,7 @@ Packages for the development version are currently not available. The following 
 
 tpfancod is covered by the GNU General Public License 3.
 
-Copyright (C) 2011-2015 Vladyslav Shtabovenko  
+Copyright (C) 2011-2016 Vladyslav Shtabovenko  
 Copyright (C) 2007-2009 Sebastian Urban
 
 tpfancod is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.

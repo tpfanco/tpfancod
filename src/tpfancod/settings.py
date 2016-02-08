@@ -57,39 +57,38 @@ class Settings(dbus.service.Object):
     product_pretty_name = None
     product_pretty_id = None
 
-    # profile info
-    loaded_profiles = []
-
     # comments for the last loaded profile
     profile_comment = ''
 
     def __init__(self, bus, path, debug, quiet, no_ibm_thermal, version, config_path, current_profile, ibm_fan, ibm_thermal, supplied_profile_dir, poll_time, watchdog_time):
+
         self.logger = logging.getLogger(__name__)
-        self.debug = debug
-        self.quiet = quiet
-        self.no_ibm_thermal = no_ibm_thermal
-        self.version = version
-        self.config_path = config_path
-        self.current_profile = current_profile
-        self.ibm_fan = ibm_fan
-        self.ibm_thermal = ibm_thermal
-        self.supplied_profile_dir = supplied_profile_dir
-        self.poll_time = poll_time
-        self.watchdog_time = watchdog_time
-        self.id_match = False
+        if not (bus is 'Dummy'):
+            self.debug = debug
+            self.quiet = quiet
+            self.no_ibm_thermal = no_ibm_thermal
+            self.version = version
+            self.config_path = config_path
+            self.current_profile = current_profile
+            self.ibm_fan = ibm_fan
+            self.ibm_thermal = ibm_thermal
+            self.supplied_profile_dir = supplied_profile_dir
+            self.poll_time = poll_time
+            self.watchdog_time = watchdog_time
+            self.id_match = False
 
-        self.profile_path = os.path.split(
-            config_path)[0] + '/' + self.current_profile
+            self.profile_path = os.path.split(
+                config_path)[0] + '/' + self.current_profile
 
-        dbus.service.Object.__init__(self, bus, path)
+            dbus.service.Object.__init__(self, bus, path)
 
-        if self.debug:
-            self.logger.setLevel(logging.DEBUG)
-        else:
-            self.logger.setLevel(logging.ERROR)
+            if self.debug:
+                self.logger.setLevel(logging.DEBUG)
+            else:
+                self.logger.setLevel(logging.ERROR)
 
-        self.read_model_info()
-        self.load()
+            self.read_model_info()
+            self.load()
 
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='a{ss}')
     def get_model_info(self):
@@ -103,7 +102,7 @@ class Settings(dbus.service.Object):
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='as')
     def get_loaded_profiles(self):
         """returns a list of the given profiles"""
-        return self.loaded_profiles
+        return [self.current_profile]
 
     @dbus.service.method('org.tpfanco.tpfancod.Settings', in_signature='', out_signature='s')
     def get_profile_comment(self):
@@ -191,6 +190,7 @@ class Settings(dbus.service.Object):
                 profile_from_db, id_match = self.get_profile_file_list()
                 if id_match:
                     self.id_match = True
+                    self.current_profile = profile_from_db
                     self.load_profile(self.read_profile(
                         profile_from_db))
                 else:
@@ -210,18 +210,21 @@ class Settings(dbus.service.Object):
         self.logger.debug('Looking for a profile in ' + model_path)
         if os.path.isfile(model_path):
             profile_file = model_path
+            self.logger.debug('Profile found!')
             id_match = True
+        else:
+            self.logger.debug('No profile available.')
         return profile_file, id_match
 
     def read_model_info(self):
         """reads model info from /sys/class/dmi/id"""
         try:
             with open("/sys/class/dmi/id/product_name", 'r') as f:
-                hw_product = f.read(256)
+                hw_product = f.read(256).rstrip()
             with open("/sys/class/dmi/id/board_vendor", 'r') as f:
-                hw_vendor = f.read(256)
+                hw_vendor = f.read(256).rstrip()
             with open("/sys/class/dmi/id/product_version", 'r') as f:
-                hw_version = f.read(256)
+                hw_version = f.read(256).rstrip()
             product_id = hw_vendor + '_' + hw_product
             self.product_id = product_id.lower()
             product_name = hw_vendor.lower() + '_' + hw_version.lower()
@@ -360,7 +363,8 @@ class Settings(dbus.service.Object):
                 return
         # other settings point to files, so we need to check if they exist
         if setting_name in ['current_profile']:
-            if not os.path.isfile(os.path.split(self.config_path)[0] + '/' + setting_value):
+            if not (os.path.isfile(os.path.split(self.config_path)[0] + '/' + setting_value) or
+                    os.path.isfile(setting_value)):
                 raise SyntaxError(
                     'The profile ' + str(setting_value) + ' doesn\'t exist')
             else:
@@ -613,6 +617,12 @@ class Settings(dbus.service.Object):
             return False
         return True
 
+    def sensor_sort(self, sensor_name):
+        if sensor_name.isdigit():
+            return int(sensor_name) + 1
+        else:
+            return 0
+
     def write_profile(self, path, is_a_string_buffer=False):
         """writes a fan profile file"""
 
@@ -647,8 +657,7 @@ class Settings(dbus.service.Object):
             current_profile.set(
                 'Options', 'hysteresis', str(self.hysteresis))
             current_profile.add_section('Sensors')
-
-            for sensor_id in set(self.sensor_names.keys()):
+            for sensor_id in sorted(set(self.sensor_names.keys()), key=self.sensor_sort):
                 ntp = {}
                 for tp in self.trigger_points[sensor_id]:
                     ntp[int(tp)] = int(self.trigger_points[sensor_id][tp])
@@ -662,7 +671,7 @@ class Settings(dbus.service.Object):
                         {'name': nname, 'scaling': self.sensor_scalings[sensor_id], 'triggers': ntp}))
 
         except Exception, e:
-            print 'Error writing current profile'
+            print 'Error writing current profile to ' + path
             print e
             return False
 

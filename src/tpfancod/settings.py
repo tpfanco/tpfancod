@@ -178,6 +178,16 @@ class Settings(dbus.service.Object):
 
         self.load_config(self.read_config(self.config_path))
         self.auto_load_profile()
+
+        # if there is no profile available, use profile_standard
+        if not self.id_match:
+            self.logger.debug(
+                'As there is no community profile for this model, use ' + self.profile_path)
+            self.load_profile(self.read_profile(self.profile_path))
+            if not self.override_profile:
+                self.logger.debug(
+                    'This custom profile will not be used, unless the override_profile option is set to True!')
+
         self.verify_tpfancod_settings()
 
     def auto_load_profile(self):
